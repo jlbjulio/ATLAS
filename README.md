@@ -73,6 +73,4 @@ atlas-qvac/
 └── tests/               Pruebas y fixtures
 ```
 
-## Origen de la base
 
-La preparación inicial fue realizada por Julio Lara. Incluye la estructura, dependencias, el entrenamiento local, el esquema de observaciones y cuatro registros sintéticos. QVAC procede del [repositorio oficial de Tether](https://github.com/tetherto/qvac). Flet, Pydantic y RapidFuzz conservan sus licencias originales. La base no contiene la aplicación funcional ni datos reales de clientes.
