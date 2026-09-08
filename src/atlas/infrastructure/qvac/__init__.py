@@ -1,0 +1,1 @@
+"""Local QVAC integration."""

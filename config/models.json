@@ -1,0 +1,36 @@
+{
+  "root": "models",
+  "runtime": {
+    "provider": "qvac",
+    "inference_mode": "local",
+    "allow_cloud_inference": false
+  },
+  "models": {
+    "extraction": {
+      "path": "models/language/qwen3-1.7b-q4_0.gguf",
+      "qvac_model_type": "llamacpp-completion"
+    },
+    "transcription": {
+      "path": "models/speech/whisper-small-q8_0.bin",
+      "vad_path": "models/speech/silero-vad-5.1.2.bin",
+      "qvac_model_type": "whispercpp-transcription"
+    },
+    "ocr": {
+      "recognizer_path": "models/ocr/latin-g2.gguf",
+      "detector_path": "models/ocr/craft-mlt-25k.gguf",
+      "qvac_model_type": "ggml-ocr"
+    },
+    "duplicates": {
+      "path": "models/embeddings/embeddinggemma-300m-q8_0.gguf",
+      "qvac_model_type": "llamacpp-embedding"
+    },
+    "speech": {
+      "path": "models/speech/supertonic3-q4_0.gguf",
+      "qvac_model_type": "tts-ggml",
+      "model_config": {
+        "ttsEngine": "supertonic",
+        "language": "es"
+      }
+    }
+  }
+}
