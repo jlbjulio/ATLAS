@@ -74,66 +74,6 @@ El registro reproducible incluye modelo, cuantización, prompt, tokens de entrad
 
 Ninguno para inferencia, RAG o procesamiento sensible. La experiencia principal debe seguir funcionando sin conexión.
 
-## Cobertura de los requisitos
-
-### Requisito general
-
-| Requisito | Implementación en ATLAS | Estado |
-| --- | --- | --- |
-| Construcción sobre QVAC | `@qvac/sdk` 0.19.0 es el runtime obligatorio para toda inferencia principal | Preparado |
-| Inferencia local o P2P | `allow_cloud_inference: false` y rutas de modelos locales en `config/models.json` | Preparado |
-| Sin APIs de inferencia en la nube | No se configura ningún proveedor remoto de IA | Preparado |
-| Uso de Pears | Intercambio P2P de observaciones entre dispositivos, sin convertirlo en dependencia de la experiencia principal | Por implementar |
-| Problema real y flujo completo | Captura, extracción, validación, confirmación, almacenamiento y visualización | Por implementar |
-| Repositorio accesible | Código, configuración, datos sintéticos e instrucciones reproducibles | Pendiente de publicación |
-| Video demostrativo | Demostración en español de máximo cinco minutos y accesible sin credenciales | Pendiente |
-| Base preexistente | Declarada íntegramente en la sección siguiente | Cumplido |
-
-### Reto de Philips
-
-| Requisito | Cobertura en ATLAS |
-| --- | --- |
-| Captura natural | Voz, texto y fotografía autorizada |
-| Extracción estructurada | Cliente, ciudad, país, modalidad, cantidad, fabricante, modelo y antigüedad |
-| Datos incompletos | Valores vacíos y pregunta por el dato faltante más valioso |
-| Dataset estructurado | SQLite inicializado desde `data/seed/installed-base.csv` |
-| Estado de observación | `Confirmed`, `Reported`, `Estimated` o `Unknown` |
-| Vista por cliente | Customer 360 con observaciones, equipos y última actualización |
-| Agregación | Dashboard y navegación geográfica |
-| Duplicados | Candidatos por coincidencia, sin fusión automática |
-| Confianza y vigencia | Puntaje explicable, confirmaciones independientes y alertas de información antigua |
-| Consultas naturales | Conversión local a filtros seguros sobre SQLite |
-| Oportunidades | Identificación explicable de equipos posiblemente renovables |
-| Fotografías | VisionPsy analiza únicamente equipos o placas permitidas |
-
-### Reto Psy
-
-| Requisito | Cobertura en ATLAS | Estado |
-| --- | --- | --- |
-| Modelo Psy central | VisionPsy-Nano-460M-Flash procesa la evidencia visual del flujo principal | Preparado |
-| `@qvac/sdk` para inferencia | El runtime evaluado será TypeScript y utilizará exclusivamente `@qvac/sdk` | Preparado |
-| Hardware edge declarado | Ryzen 7 5800H, 15.3 GB RAM y RTX 3050 Laptop 4 GB | Cumplido |
-| Aplicación útil sin servicios remotos | Datos, modelos y SQLite permanecen locales | Diseñado |
-| Modelo y cuantización honestos | Repositorio, archivo, proyector y Q4_K_M imatrix identificados | Cumplido |
-| Código abierto permisivo | Licencia MIT | Cumplido |
-| Limitaciones y seguridad | Evidencia candidata, confirmación humana y prohibición de imágenes de pacientes | Cumplido |
-| Calidad medible | Casos de voz, inconsistencias y métricas de extracción reproducibles | Preparado |
-| Registro de rendimiento | Esquema con carga, prompt, tokens, TTFT y throughput | Preparado; faltan mediciones |
-| Flujo funcional completo | Captura hasta visualización y oportunidad | Por implementar |
-| Video de hasta cinco minutos | Debe mostrar el flujo y el hardware declarado | Pendiente |
-
-## Uso de los archivos proporcionados
-
-| Contenido original | Uso dentro del proyecto |
-| --- | --- |
-| Documento del reto | Fuente de los requisitos funcionales y de diseño |
-| `Dummy Installed Base` | 20 registros preservados en el XLSX y convertidos a CSV para SQLite |
-| `Agent Question Logic` | 12 pasos convertidos a `config/question-logic.json` |
-| `Dummy Reference Lists` | 19 valores convertidos a `config/reference-values.json` |
-| `Voice Test Prompts` | 10 pruebas convertidas a `data/evaluation/voice-cases.jsonl` |
-| Inconsistencias detectadas | Dos casos conservados en `data/evaluation/data-quality-cases.json` |
-
-El XLSX guardado en `data/source/` coincide mediante SHA-256 con el archivo proporcionado. Las conversiones no sustituyen ni modifican el original.
 
 ## Base preexistente
 
