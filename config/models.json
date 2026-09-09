@@ -17,16 +17,20 @@
       "central_psy_model": true
     },
     "extraction": {
-      "path": "models/language/qwen3-1.7b-q4_0.gguf",
+      "path": "models/language/qwen3-0.6b-q4_0.gguf",
+      "lora_path": "training/output/atlas-extraction-lora.gguf",
+      "quantization": "Q4_0",
       "qvac_model_type": "llamacpp-completion"
     },
     "transcription": {
       "path": "models/speech/whisper-small-q8_0.bin",
       "vad_path": "models/speech/silero-vad-5.1.2.bin",
+      "quantization": "Q8_0",
       "qvac_model_type": "whispercpp-transcription"
     },
     "duplicates": {
       "path": "models/embeddings/embeddinggemma-300m-q8_0.gguf",
+      "quantization": "Q8_0",
       "qvac_model_type": "llamacpp-embedding"
     }
   }

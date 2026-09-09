@@ -7,6 +7,8 @@ __pycache__/
 *.db
 *.db-shm
 *.db-wal
+data/local/
+*.egg-info/
 *.sqlite
 *.sqlite3
 .env

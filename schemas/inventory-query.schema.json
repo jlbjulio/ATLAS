@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlas.local/schemas/inventory-query.schema.json",
+  "title": "Safe installed-base query filters",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "customer",
+    "country",
+    "city",
+    "modality",
+    "brand",
+    "minimum_age_years",
+    "maximum_age_years",
+    "status",
+    "stale_only",
+    "limit"
+  ],
+  "properties": {
+    "customer": { "type": ["string", "null"] },
+    "country": { "type": ["string", "null"] },
+    "city": { "type": ["string", "null"] },
+    "modality": { "type": ["string", "null"] },
+    "brand": { "type": ["string", "null"] },
+    "minimum_age_years": { "type": ["number", "null"], "minimum": 0 },
+    "maximum_age_years": { "type": ["number", "null"], "minimum": 0 },
+    "status": {
+      "enum": ["Confirmado", "Reportado", "Estimado", "Desconocido", null]
+    },
+    "stale_only": { "type": "boolean" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 500 }
+  }
+}

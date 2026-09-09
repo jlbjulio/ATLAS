@@ -1,20 +1,17 @@
 {
-  "format": "qvac-sft-jsonl",
-  "assistant_loss_only": true,
-  "base_model": "QWEN3_1_7B_INST_Q4",
-  "quantization": "Q4_0",
-  "schema": "../../schemas/installed-base-observation.schema.json",
+  "format": "QVAC SFT JSONL",
+  "generated_by": "training/generate_dataset.py",
+  "seed": 41021,
   "splits": {
-    "train": "train.jsonl",
-    "validation": "validation.jsonl",
-    "test": "test.jsonl"
+    "train": 60,
+    "validation": 12,
+    "test": 36
   },
-  "tasks": [
-    "extract_explicit_installed_base_facts",
-    "preserve_unknown_values",
-    "assign_evidence_status",
-    "select_highest_value_follow_up"
+  "languages": [
+    "Spanish",
+    "English",
+    "Portuguese"
   ],
-  "contains_real_customer_data": false,
-  "note": "Los ejemplos iniciales son sintéticos y solo validan el formato de entrenamiento."
+  "purpose": "Installed-base observation extraction and uncertainty handling",
+  "synthetic": true
 }

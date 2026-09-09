@@ -1,6 +1,23 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas-installed-base"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic==2.13.4",
+    "rapidfuzz==3.14.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 target-version = "py311"
@@ -8,4 +25,3 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
-

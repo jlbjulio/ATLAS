@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "description": "Base tecnica local de ATLAS para inteligencia de equipos instalados",
+  "description": "Private edge intelligence for verified healthcare installed-base operations",
   "scripts": {
     "setup": "python tools/prepare_environment.py",
     "models:download": "node tools/download-models.js",
+    "qvac:health": "tsx src/qvac/cli.ts health",
+    "train:evaluate": "tsx training/evaluate_adapter.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests && python -m pytest -q",

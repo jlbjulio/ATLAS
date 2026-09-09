@@ -1,137 +1,273 @@
-"""Conexión, transacciones y migraciones de SQLite."""
+"""SQLite connection, schema, and deterministic demo-data import."""
 
+from __future__ import annotations
+
+import csv
+import json
 import sqlite3
-import uuid
-import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
-import openpyxl 
+from uuid import NAMESPACE_URL, uuid5
 
-# Calculamos la raíz del proyecto.
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
-DB_PATH = BASE_DIR / "atlas_local.db"
-EXCEL_PATH = BASE_DIR / "Dummy_Installed_Base_Hackathon.xlsx"
+from atlas.domain.equipment import normalized_key
 
-class DatabaseManager:
-    """Gestor principal de la base de datos local SQLite."""
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "local" / "atlas.db"
+DEFAULT_SEED_PATH = PROJECT_ROOT / "data" / "seed" / "installed-base.csv"
 
-    def __init__(self, db_path: str = DB_PATH):
-        self.db_path = db_path
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS customers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    city TEXT NOT NULL,
+    country TEXT NOT NULL,
+    normalized_key TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 
-    def get_connection(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row 
-        return conn
+CREATE TABLE IF NOT EXISTS observations (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    observer TEXT,
+    visit_date TEXT NOT NULL,
+    raw_text TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL,
+    status TEXT NOT NULL,
+    confidence_score REAL NOT NULL CHECK(confidence_score BETWEEN 0 AND 1),
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    confirmed_at TEXT
+);
 
-    def init_schema(self):
-        """Crea el esquema de tablas."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS Customers (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    city TEXT,
-                    country TEXT,
-                    is_synced BOOLEAN DEFAULT 0
+CREATE TABLE IF NOT EXISTS assets (
+    id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    modality TEXT,
+    quantity INTEGER CHECK(quantity IS NULL OR quantity > 0),
+    brand TEXT,
+    model TEXT,
+    serial_number TEXT,
+    age_years REAL CHECK(age_years IS NULL OR age_years >= 0),
+    installation_year INTEGER,
+    status TEXT NOT NULL,
+    confidence REAL NOT NULL CHECK(confidence BETWEEN 0 AND 1),
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL,
+    independent_confirmations INTEGER NOT NULL DEFAULT 1,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS asset_observations (
+    asset_id TEXT NOT NULL REFERENCES assets(id),
+    observation_id TEXT NOT NULL REFERENCES observations(id),
+    evidence_text TEXT,
+    field_values_json TEXT NOT NULL,
+    PRIMARY KEY (asset_id, observation_id)
+);
+
+CREATE TABLE IF NOT EXISTS evidence (
+    id TEXT PRIMARY KEY,
+    observation_id TEXT NOT NULL REFERENCES observations(id),
+    kind TEXT NOT NULL,
+    local_path TEXT,
+    sha256 TEXT,
+    excerpt TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS duplicate_candidates (
+    id TEXT PRIMARY KEY,
+    incoming_asset_id TEXT NOT NULL REFERENCES assets(id),
+    existing_asset_id TEXT NOT NULL REFERENCES assets(id),
+    score REAL NOT NULL CHECK(score BETWEEN 0 AND 1),
+    reasons_json TEXT NOT NULL,
+    conflicts_json TEXT NOT NULL,
+    review_status TEXT NOT NULL DEFAULT 'Pending',
+    created_at TEXT NOT NULL,
+    UNIQUE(incoming_asset_id, existing_asset_id)
+);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+    id TEXT PRIMARY KEY,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    actor TEXT,
+    payload_json TEXT NOT NULL,
+    previous_hash TEXT,
+    event_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sync_outbox (
+    id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    payload_hash TEXT NOT NULL UNIQUE,
+    state TEXT NOT NULL DEFAULT 'Pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_assets_customer ON assets(customer_id);
+CREATE INDEX IF NOT EXISTS idx_assets_serial ON assets(serial_number);
+CREATE INDEX IF NOT EXISTS idx_assets_last_seen ON assets(last_seen);
+CREATE INDEX IF NOT EXISTS idx_observations_customer ON observations(customer_id);
+"""
+
+CONFIDENCE_MAP = {"High": 0.9, "Medium": 0.65, "Low": 0.4}
+STATUS_MAP = {
+    "Confirmed": "Confirmado",
+    "Reported": "Reportado",
+    "Estimated": "Estimado",
+    "Unknown": "Desconocido",
+}
+
+
+def utc_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+class SQLiteDatabase:
+    def __init__(self, path: str | Path = DEFAULT_DB_PATH) -> None:
+        self.path = Path(path)
+
+    def connect(self) -> sqlite3.Connection:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(self.path)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA journal_mode = WAL")
+        return connection
+
+    @contextmanager
+    def transaction(self) -> Iterator[sqlite3.Connection]:
+        connection = self.connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def initialize(self) -> None:
+        with self.connect() as connection:
+            connection.executescript(SCHEMA)
+
+    def seed_from_csv(self, path: str | Path = DEFAULT_SEED_PATH) -> dict[str, int]:
+        """Import the sponsor dataset without inventing or coercing unknown values."""
+
+        seed_path = Path(path)
+        counts = {"customers": 0, "observations": 0, "assets": 0}
+        with seed_path.open(encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+
+        now = utc_iso()
+        with self.transaction() as connection:
+            for row in rows:
+                customer_key = "|".join(
+                    [
+                        normalized_key(row["customer_hospital"]),
+                        normalized_key(row["city"]),
+                        normalized_key(row["country"]),
+                    ]
                 )
-            ''')
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS Equipment (
-                    id TEXT PRIMARY KEY,
-                    customer_id TEXT,
-                    modality TEXT NOT NULL,
-                    manufacturer TEXT,
-                    model TEXT,
-                    quantity INTEGER DEFAULT 1,
-                    estimated_age_years INTEGER,
-                    confidence_level TEXT DEFAULT 'Reported',
-                    is_synced BOOLEAN DEFAULT 0,
-                    FOREIGN KEY (customer_id) REFERENCES Customers (id)
+                customer_id = str(uuid5(NAMESPACE_URL, f"atlas:customer:{customer_key}"))
+                before = connection.total_changes
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO customers
+                        (id, name, city, country, normalized_key, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        customer_id,
+                        row["customer_hospital"],
+                        row["city"],
+                        row["country"],
+                        customer_key,
+                        now,
+                        now,
+                    ),
                 )
-            ''')
-            
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS Observations (
-                    id TEXT PRIMARY KEY,
-                    customer_id TEXT,
-                    original_text TEXT,
-                    capture_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_synced BOOLEAN DEFAULT 0,
-                    FOREIGN KEY (customer_id) REFERENCES Customers (id)
+                counts["customers"] += connection.total_changes - before
+
+                observation_id = f"seed-{row['observation_id']}"
+                confidence = CONFIDENCE_MAP.get(row["confidence"], 0.3)
+                before = connection.total_changes
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO observations
+                        (id, customer_id, observer, visit_date, raw_text, source, status,
+                         confidence_score, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        observation_id,
+                        customer_id,
+                        row["observer"] or None,
+                        row["visit_date"],
+                        row["voice_input_example"] or "",
+                        row["source"],
+                        STATUS_MAP.get(row["status"], "Desconocido"),
+                        confidence,
+                        now,
+                    ),
                 )
-            ''')
-            
-            conn.commit()
-            print("Esquema de SQLite inicializado correctamente.")
+                counts["observations"] += connection.total_changes - before
 
-    def seed_from_excel(self, excel_path: str = EXCEL_PATH):
-        """Lee el Excel sintético usando openpyxl (evitando bloqueos de seguridad)."""
-        if not os.path.exists(excel_path):
-            print(f"No se encontró el archivo: {excel_path}")
-            return
-
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("SELECT COUNT(*) FROM Customers")
-            if cursor.fetchone()[0] > 0:
-                print("ℹLa base de datos ya contiene información. Omitiendo siembra.")
-                return
-
-            print("Procesando archivo Excel con openpyxl puro...")
-            try:
-                wb = openpyxl.load_workbook(excel_path, data_only=True)
-                sheet = wb.active
-                
-                headers = [str(cell.value).strip() if cell.value else f"col_{i}" for i, cell in enumerate(sheet[1])]
-                clientes_procesados = {}
-                equipos_insertados = 0
-                
-                for row in sheet.iter_rows(min_row=2, values_only=True):
-                    if not any(row): continue 
-                    
-                    row_data = dict(zip(headers, row))
-                    
-                    customer_name = str(row_data.get('Customer') or f'Unknown_{uuid.uuid4()}').strip()
-                    city = str(row_data.get('City') or 'Unknown').strip()
-                    country = str(row_data.get('Country') or 'Unknown').strip()
-                    modality = str(row_data.get('Modality') or 'Unknown').strip()
-                    manufacturer = str(row_data.get('Manufacturer') or 'Unknown').strip()
-                    
-                    try: quantity = int(row_data.get('Quantity') or 1)
-                    except: quantity = 1
-                    
-                    try: age = int(row_data.get('Age') or 0)
-                    except: age = 0
-
-                    # 1. Insertar Cliente (corregido con los 4 parámetros)
-                    if customer_name not in clientes_procesados:
-                        customer_id = str(uuid.uuid4())
-                        clientes_procesados[customer_name] = customer_id
-                        cursor.execute('''
-                            INSERT INTO Customers (id, name, city, country, is_synced)
-                            VALUES (?, ?, ?, ?, 1)
-                        ''', (customer_id, customer_name, city, country)) # <-- Aquí estaba el error
-                    else:
-                        customer_id = clientes_procesados[customer_name]
-                        
-                    # 2. Insertar Equipo
-                    cursor.execute('''
-                        INSERT INTO Equipment (id, customer_id, modality, manufacturer, quantity, estimated_age_years, confidence_level, is_synced)
-                        VALUES (?, ?, ?, ?, ?, ?, 'Confirmed', 1)
-                    ''', (str(uuid.uuid4()), customer_id, modality, manufacturer, quantity, age))
-                    
-                    equipos_insertados += 1
-                    
-                conn.commit()
-                print(f"Éxito: {len(clientes_procesados)} clientes y {equipos_insertados} equipos cargados de forma segura.")
-                
-            except Exception as e:
-                print(f"Error al procesar el Excel: {e}")
-
-if __name__ == "__main__":
-    db = DatabaseManager()
-    db.init_schema()
-    db.seed_from_excel()
+                asset_id = str(uuid5(NAMESPACE_URL, f"atlas:seed-asset:{row['observation_id']}"))
+                quantity = int(row["quantity"]) if row["quantity"] else None
+                age = float(row["approx_age_years"]) if row["approx_age_years"] else None
+                install_year = (
+                    int(row["estimated_installation_year"])
+                    if row["estimated_installation_year"]
+                    else None
+                )
+                before = connection.total_changes
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO assets
+                        (id, customer_id, modality, quantity, brand, model, serial_number,
+                         age_years, installation_year, status, confidence, first_seen,
+                         last_seen, notes, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        asset_id,
+                        customer_id,
+                        row["modality"] or None,
+                        quantity,
+                        row["brand"] or None,
+                        row["model"] or None,
+                        age,
+                        install_year,
+                        STATUS_MAP.get(row["status"], "Desconocido"),
+                        confidence,
+                        row["visit_date"],
+                        row["visit_date"],
+                        row["notes"] or None,
+                        now,
+                        now,
+                    ),
+                )
+                counts["assets"] += connection.total_changes - before
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO asset_observations
+                        (asset_id, observation_id, evidence_text, field_values_json)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (asset_id, observation_id, row["voice_input_example"], json.dumps(row)),
+                )
+        return counts

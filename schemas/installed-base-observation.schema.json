@@ -4,17 +4,39 @@
   "title": "Installed base observation",
   "type": "object",
   "additionalProperties": false,
-  "required": ["client", "city", "country", "equipment", "missing_fields", "next_question"],
+  "required": [
+    "client",
+    "city",
+    "country",
+    "equipment",
+    "missing_fields",
+    "next_question",
+    "input_language",
+    "privacy_flags"
+  ],
   "properties": {
     "client": { "type": ["string", "null"] },
     "city": { "type": ["string", "null"] },
     "country": { "type": ["string", "null"] },
     "equipment": {
       "type": "array",
+      "maxItems": 20,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["modality", "quantity", "brand", "model", "age_years", "status"],
+        "required": [
+          "modality",
+          "quantity",
+          "brand",
+          "model",
+          "age_years",
+          "status",
+          "serial_number",
+          "installation_year",
+          "confidence",
+          "evidence_text",
+          "notes"
+        ],
         "properties": {
           "modality": { "type": ["string", "null"] },
           "quantity": { "type": ["integer", "null"], "minimum": 1 },
@@ -23,7 +45,16 @@
           "age_years": { "type": ["number", "null"], "minimum": 0 },
           "status": {
             "enum": ["Confirmado", "Reportado", "Estimado", "Desconocido"]
-          }
+          },
+          "serial_number": { "type": ["string", "null"] },
+          "installation_year": {
+            "type": ["integer", "null"],
+            "minimum": 1900,
+            "maximum": 2200
+          },
+          "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "evidence_text": { "type": ["string", "null"], "maxLength": 500 },
+          "notes": { "type": ["string", "null"], "maxLength": 500 }
         }
       }
     },
@@ -32,6 +63,12 @@
       "items": { "type": "string" },
       "uniqueItems": true
     },
-    "next_question": { "type": ["string", "null"] }
+    "next_question": { "type": ["string", "null"], "maxLength": 240 },
+    "input_language": { "type": ["string", "null"] },
+    "privacy_flags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    }
   }
 }
