@@ -77,19 +77,21 @@ Ninguno para inferencia, RAG o procesamiento sensible. La experiencia principal 
 
 ## Base preexistente
 
-Antes del inicio de la ventana oficial de desarrollo existían los siguientes elementos:
+El proyecto partió de los siguientes elementos preexistentes:
 
 | Elemento | Origen | Uso |
 | --- | --- | --- |
-| Repositorio inicial (`48aa25d`) | Julio Lara | `.gitignore`, licencia y README inicial |
-| Scaffold técnico (`700d18b`) | Julio Lara | Arquitectura, README, configuración, esquemas, pruebas, stubs Python/Flet, herramientas de entorno y preparación de LoRA |
-| Primer prototipo funcional | Ethan Martinez | Interfaz inicial en Flet, almacenamiento SQLite, captura de audio mediante FFmpeg, transcripción y extracción preliminar con el SDK Python de QVAC |
+| Repositorio inicial (`48aa25d`, 8 de septiembre de 2026, 3:10 p. m. UTC-5) | Julio Lara | `.gitignore`, licencia y README inicial |
+| Scaffold técnico (`700d18b`, 8 de septiembre de 2026, 5:17 p. m. UTC-5) | Julio Lara | Arquitectura, README, configuración, esquemas, pruebas, stubs Python/Flet, herramientas de entorno y preparación de LoRA |
+| Actualización del README (`2f33371`, 8 de septiembre de 2026, 6:34 p. m. UTC-5) | Julio Lara | Ajuste de documentación |
+| Primer prototipo funcional (`c0d250f`, 9 de septiembre de 2026, 1:04 a. m. UTC-5) | Ethan Martinez | Interfaz inicial en Flet, almacenamiento SQLite, captura de audio mediante FFmpeg, transcripción y extracción preliminar con el SDK Python de QVAC |
 | Cuatro fixtures SFT sintéticos | Generados por el equipo | Validación de formato; no se entrenó un adaptador final |
 | Modelos locales descargados | Registro oficial de QVAC y repositorios de Tether AI Research | Preparación del entorno; pesos excluidos de Git |
 | `customer-installed-base-challenge.docx` | Philips | Especificación del problema |
 | `dummy-installed-base.xlsx` | Philips | Dataset sintético |
 | CSV y JSON derivados | Conversión mecánica del XLSX mediante Python y openpyxl | Semilla y evaluación |
 
+El prototipo del commit `c0d250f` forma parte de la base preexistente. Toda nueva base, plantilla, fuente, modelo o componente externo incorporado se añadirá a esta declaración.
 
 ## Componentes externos
 
