@@ -81,18 +81,15 @@ Antes del inicio de la ventana oficial de desarrollo existían los siguientes el
 
 | Elemento | Origen | Uso |
 | --- | --- | --- |
-| Repositorio inicial (`48aa25d`) | Julio Lara, antes de la ventana oficial | `.gitignore`, licencia y README inicial |
-| Scaffold técnico (`700d18b`) | Julio Lara con asistencia de OpenAI Codex, antes de la ventana oficial | Arquitectura, README, configuración, esquemas, pruebas, stubs Python/Flet, herramientas de entorno y preparación de LoRA |
-| Actualización del README (`2f33371`) | Julio Lara, antes de la ventana oficial | Ajuste de documentación |
-| Primer prototipo funcional (`c0d250f`, 9 de septiembre de 2026, 1:04 a. m. UTC-5) | Ethan Martinez, antes de la ventana oficial | Interfaz inicial en Flet, almacenamiento SQLite, captura de audio mediante FFmpeg, transcripción y extracción preliminar con el SDK Python de QVAC |
-| Cuatro fixtures SFT sintéticos | Generados por el equipo con asistencia de OpenAI Codex | Validación de formato; no se entrenó un adaptador final |
+| Repositorio inicial (`48aa25d`) | Julio Lara | `.gitignore`, licencia y README inicial |
+| Scaffold técnico (`700d18b`) | Julio Lara | Arquitectura, README, configuración, esquemas, pruebas, stubs Python/Flet, herramientas de entorno y preparación de LoRA |
+| Primer prototipo funcional | Ethan Martinez | Interfaz inicial en Flet, almacenamiento SQLite, captura de audio mediante FFmpeg, transcripción y extracción preliminar con el SDK Python de QVAC |
+| Cuatro fixtures SFT sintéticos | Generados por el equipo | Validación de formato; no se entrenó un adaptador final |
 | Modelos locales descargados | Registro oficial de QVAC y repositorios de Tether AI Research | Preparación del entorno; pesos excluidos de Git |
 | `customer-installed-base-challenge.docx` | Philips | Especificación del problema |
 | `dummy-installed-base.xlsx` | Philips | Dataset sintético |
 | CSV y JSON derivados | Conversión mecánica del XLSX mediante Python y openpyxl | Semilla y evaluación |
-| Logo y banner | Generados con OpenAI antes de la construcción funcional; almacenados fuera del repositorio | Identidad de la entrega |
 
-El prototipo del commit `c0d250f` constituye trabajo funcional previo y se declara expresamente para cumplir las reglas de participación. Su existencia no implica que sea la implementación final evaluada. Toda nueva librería, plantilla, fuente, modelo o componente incorporado se añadirá a esta declaración.
 
 ## Componentes externos
 
