@@ -44,9 +44,15 @@ def test_inference_is_restricted_to_local_qvac() -> None:
     config = json.loads((ROOT / "config" / "models.json").read_text(encoding="utf-8"))
     assert config["runtime"] == {
         "provider": "qvac",
+        "sdk": "@qvac/sdk",
+        "sdk_version": "0.19.0",
         "inference_mode": "local",
         "allow_cloud_inference": False,
     }
+    assert config["models"]["vision"]["central_psy_model"] is True
+    assert config["models"]["vision"]["repository"] == (
+        "qvac/VisionPsy-Nano-460M-Flash-GGUFs"
+    )
 
     for model in config["models"].values():
         for key, value in model.items():

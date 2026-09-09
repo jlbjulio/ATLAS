@@ -1,1 +1,1 @@
-"""Lectura local de fotografías de placas mediante OCR de QVAC."""
+"""Adaptador de fotografías para el runtime TypeScript local de VisionPsy."""

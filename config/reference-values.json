@@ -1,0 +1,89 @@
+{
+  "source": "Philips-provided synthetic workbook",
+  "values": {
+    "brand": [
+      {
+        "value": "NovaMed",
+        "notes": "Fictional manufacturer for hackathon testing only"
+      },
+      {
+        "value": "Aurelia Health",
+        "notes": "Fictional manufacturer for hackathon testing only"
+      },
+      {
+        "value": "BluePeak Medical",
+        "notes": "Fictional manufacturer for hackathon testing only"
+      },
+      {
+        "value": "Orion Imaging",
+        "notes": "Fictional manufacturer for hackathon testing only"
+      },
+      {
+        "value": "HelixCare",
+        "notes": "Fictional manufacturer for hackathon testing only"
+      },
+      {
+        "value": "Zenith MedTech",
+        "notes": "Fictional manufacturer for hackathon testing only"
+      }
+    ],
+    "confidence": [
+      {
+        "value": "High",
+        "notes": "Suggested confidence value"
+      },
+      {
+        "value": "Medium",
+        "notes": "Suggested confidence value"
+      },
+      {
+        "value": "Low",
+        "notes": "Suggested confidence value"
+      }
+    ],
+    "modality": [
+      {
+        "value": "MR",
+        "notes": "Example equipment category"
+      },
+      {
+        "value": "CT",
+        "notes": "Example equipment category"
+      },
+      {
+        "value": "Ultrasound",
+        "notes": "Example equipment category"
+      },
+      {
+        "value": "X-Ray",
+        "notes": "Example equipment category"
+      },
+      {
+        "value": "Patient Monitoring",
+        "notes": "Example equipment category"
+      },
+      {
+        "value": "Image Guided Therapy",
+        "notes": "Example equipment category"
+      }
+    ],
+    "status": [
+      {
+        "value": "Confirmed",
+        "notes": "Suggested observation status"
+      },
+      {
+        "value": "Reported",
+        "notes": "Suggested observation status"
+      },
+      {
+        "value": "Estimated",
+        "notes": "Suggested observation status"
+      },
+      {
+        "value": "Unknown",
+        "notes": "Suggested observation status"
+      }
+    ]
+  }
+}

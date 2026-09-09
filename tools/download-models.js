@@ -8,11 +8,10 @@ import {
   close,
   downloadAsset,
   EMBEDDINGGEMMA_300M_Q8_0,
-  OCR_CRAFT,
-  OCR_LATIN,
+  MMPROJ_VISIONPSY_NANO_460M_MULTIMODAL_Q8_0,
   QWEN3_1_7B_INST_Q4,
-  TTS_MULTILINGUAL_SUPERTONIC3_Q4_0,
   VAD_SILERO_5_1_2,
+  VISIONPSY_NANO_460M_MULTIMODAL_Q4_K_M,
   WHISPER_SMALL_Q8_0,
 } from "@qvac/sdk";
 
@@ -20,13 +19,18 @@ const root = resolve(import.meta.dirname, "..");
 const cacheRoot = join(homedir(), ".qvac", "models");
 
 const assets = [
+  [
+    VISIONPSY_NANO_460M_MULTIMODAL_Q4_K_M,
+    "models/vision/visionpsy-nano-460m-flash-q4_k_m-imat.gguf",
+  ],
+  [
+    MMPROJ_VISIONPSY_NANO_460M_MULTIMODAL_Q8_0,
+    "models/vision/mmproj-visionpsy-nano-460m-flash-q8.gguf",
+  ],
   [QWEN3_1_7B_INST_Q4, "models/language/qwen3-1.7b-q4_0.gguf"],
   [WHISPER_SMALL_Q8_0, "models/speech/whisper-small-q8_0.bin"],
   [VAD_SILERO_5_1_2, "models/speech/silero-vad-5.1.2.bin"],
-  [OCR_CRAFT, "models/ocr/craft-mlt-25k.gguf"],
-  [OCR_LATIN, "models/ocr/latin-g2.gguf"],
   [EMBEDDINGGEMMA_300M_Q8_0, "models/embeddings/embeddinggemma-300m-q8_0.gguf"],
-  [TTS_MULTILINGUAL_SUPERTONIC3_Q4_0, "models/speech/supertonic3-q4_0.gguf"],
 ];
 
 async function sha256(path) {

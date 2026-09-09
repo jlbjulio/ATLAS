@@ -2,10 +2,20 @@
   "root": "models",
   "runtime": {
     "provider": "qvac",
+    "sdk": "@qvac/sdk",
+    "sdk_version": "0.19.0",
     "inference_mode": "local",
     "allow_cloud_inference": false
   },
   "models": {
+    "vision": {
+      "path": "models/vision/visionpsy-nano-460m-flash-q4_k_m-imat.gguf",
+      "projector_path": "models/vision/mmproj-visionpsy-nano-460m-flash-q8.gguf",
+      "repository": "qvac/VisionPsy-Nano-460M-Flash-GGUFs",
+      "quantization": "Q4_K_M imatrix",
+      "qvac_model_type": "llamacpp-completion",
+      "central_psy_model": true
+    },
     "extraction": {
       "path": "models/language/qwen3-1.7b-q4_0.gguf",
       "qvac_model_type": "llamacpp-completion"
@@ -15,22 +25,9 @@
       "vad_path": "models/speech/silero-vad-5.1.2.bin",
       "qvac_model_type": "whispercpp-transcription"
     },
-    "ocr": {
-      "recognizer_path": "models/ocr/latin-g2.gguf",
-      "detector_path": "models/ocr/craft-mlt-25k.gguf",
-      "qvac_model_type": "ggml-ocr"
-    },
     "duplicates": {
       "path": "models/embeddings/embeddinggemma-300m-q8_0.gguf",
       "qvac_model_type": "llamacpp-embedding"
-    },
-    "speech": {
-      "path": "models/speech/supertonic3-q4_0.gguf",
-      "qvac_model_type": "tts-ggml",
-      "model_config": {
-        "ttsEngine": "supertonic",
-        "language": "es"
-      }
     }
   }
 }

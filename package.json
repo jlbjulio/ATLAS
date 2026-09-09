@@ -1,8 +1,8 @@
 {
   "name": "atlas-installed-base",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
+  "license": "MIT",
   "description": "Base tecnica local de ATLAS para inteligencia de equipos instalados",
   "scripts": {
     "setup": "python tools/prepare_environment.py",

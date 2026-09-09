@@ -1,1 +1,1 @@
-"""Pipeline local de voz, OCR, extracción estructurada y embeddings."""
+"""Orquestación de la UI con la inferencia TypeScript local de @qvac/sdk."""

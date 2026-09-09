@@ -1,0 +1,101 @@
+{
+  "source": "Philips-provided synthetic workbook",
+  "steps": [
+    {
+      "step": 1,
+      "information_to_capture": "Customer / Hospital",
+      "required": "Yes",
+      "example_agent_question": "Which customer or hospital are you visiting?",
+      "example_user_answer": "Hospital DemoCare Pacific",
+      "validation_logic": "Match against customer list if available; otherwise create a new candidate record."
+    },
+    {
+      "step": 2,
+      "information_to_capture": "Country / City",
+      "required": "Yes",
+      "example_agent_question": "Which city and country is the customer in?",
+      "example_user_answer": "Panama City, Panama",
+      "validation_logic": "Use location to disambiguate customers with similar names."
+    },
+    {
+      "step": 3,
+      "information_to_capture": "Modality / Equipment Type",
+      "required": "Yes",
+      "example_agent_question": "What type of equipment did you observe?",
+      "example_user_answer": "MR and CT",
+      "validation_logic": "Normalize synonyms such as MRI -> MR, scanner -> CT when context is clear."
+    },
+    {
+      "step": 4,
+      "information_to_capture": "Quantity",
+      "required": "Yes",
+      "example_agent_question": "How many units did you observe?",
+      "example_user_answer": "Two MR and one CT",
+      "validation_logic": "Ask separately by modality if multiple equipment types are mentioned."
+    },
+    {
+      "step": 5,
+      "information_to_capture": "Brand",
+      "required": "Preferred",
+      "example_agent_question": "Do you know the brand or manufacturer?",
+      "example_user_answer": "NovaMed",
+      "validation_logic": "If unknown, save as Unknown. Never force a guess."
+    },
+    {
+      "step": 6,
+      "information_to_capture": "Model",
+      "required": "Optional",
+      "example_agent_question": "Do you know the model or product family?",
+      "example_user_answer": "NM-MR 700",
+      "validation_logic": "If not visible, leave blank or Unknown."
+    },
+    {
+      "step": 7,
+      "information_to_capture": "Approximate Age",
+      "required": "Preferred",
+      "example_agent_question": "Approximately how old is the equipment?",
+      "example_user_answer": "Around seven years",
+      "validation_logic": "Accept ranges such as 5-7 years or qualitative answers like new / old."
+    },
+    {
+      "step": 8,
+      "information_to_capture": "Installation Year",
+      "required": "Derived / Optional",
+      "example_agent_question": "Do you know approximately when it was installed?",
+      "example_user_answer": "Around 2019",
+      "validation_logic": "If age is known, estimate installation year from observation date."
+    },
+    {
+      "step": 9,
+      "information_to_capture": "Confidence",
+      "required": "Derived",
+      "example_agent_question": "How certain are you about this information?",
+      "example_user_answer": "I am quite sure about quantity, less sure about age.",
+      "validation_logic": "Agent can infer High / Medium / Low by field."
+    },
+    {
+      "step": 10,
+      "information_to_capture": "Status",
+      "required": "Derived",
+      "example_agent_question": "Is this directly observed, reported by someone, or estimated?",
+      "example_user_answer": "Directly observed",
+      "validation_logic": "Recommended values: Confirmed, Reported, Estimated, Unknown."
+    },
+    {
+      "step": 11,
+      "information_to_capture": "Notes",
+      "required": "Optional",
+      "example_agent_question": "Anything else useful about the equipment or site?",
+      "example_user_answer": "One MR appears newer than the other.",
+      "validation_logic": "Capture free text without losing structured fields."
+    },
+    {
+      "step": 12,
+      "information_to_capture": "Review",
+      "required": "Yes",
+      "example_agent_question": "I captured: 2 MR, NovaMed, approx. 7 years; 1 CT, Aurelia Health, approx. 5 years. Is that correct?",
+      "example_user_answer": "Yes",
+      "validation_logic": "Always confirm the structured summary before saving."
+    }
+  ]
+}

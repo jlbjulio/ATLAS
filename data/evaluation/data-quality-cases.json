@@ -1,0 +1,17 @@
+{
+  "source": "Review of the Philips-provided synthetic workbook",
+  "cases": [
+    {
+      "id": "mixed-age-total-mismatch",
+      "observation_ids": [3, 4],
+      "issue": "The spoken input reports three MR systems, while the two seed rows total four units.",
+      "expected_behavior": "Flag the records as conflicting and require review. Do not silently add or merge the quantities."
+    },
+    {
+      "id": "partially-known-manufacturer",
+      "observation_ids": [6],
+      "issue": "The follow-up identifies four HelixCare ultrasound systems and one with an unknown manufacturer, while the seed row assigns HelixCare to all five.",
+      "expected_behavior": "Split the observation into four HelixCare units and one Unknown unit, or keep the manufacturer unresolved until the user confirms."
+    }
+  ]
+}

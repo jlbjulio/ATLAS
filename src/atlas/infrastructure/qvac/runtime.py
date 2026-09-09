@@ -1,1 +1,1 @@
-"""Carga, descarga y ciclo de vida de los modelos locales de QVAC."""
+"""Cliente del runtime TypeScript local; no ejecuta inferencia en la nube."""

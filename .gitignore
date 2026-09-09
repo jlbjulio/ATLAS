@@ -18,6 +18,7 @@ data/audio/
 dist/
 build/
 runtime-data/
-artifacts/
+artifacts/private/
+artifacts/tmp/
 models/*
 !models/.gitignore
