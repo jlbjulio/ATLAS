@@ -210,6 +210,14 @@ export function InstalledBasePage() {
         </Card>
       </div>
 
+      {(searchQuery || modalityFilter || statusFilter || brandFilter) && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-surface-600" role="status">
+          <span className="font-medium text-surface-900">{filteredClients.reduce((sum, client) => sum + client.equipments.reduce((s, e) => s + e.quantity, 0), 0)} unidades coinciden</span>
+          <span className="text-surface-400">en {filteredClients.length} clientes</span>
+          <Button size="sm" variant="ghost" onClick={() => { setSearchQuery(''); setModalityFilter(''); setStatusFilter(''); setBrandFilter(''); }}>Limpiar filtros</Button>
+        </div>
+      )}
+
       {viewMode === 'cards' ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredClients.map((client) => (
@@ -272,16 +280,16 @@ export function InstalledBasePage() {
         <Card>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="min-w-[760px] w-full">
                 <thead>
                   <tr className="border-b border-surface-200">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Cliente</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Ubicación</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Equipos</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Modalidades</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Renovaciones</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Última Visita</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-surface-500 uppercase tracking-wider">Acciones</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Cliente</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Ubicación</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Equipos</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Modalidades</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Renovaciones</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-surface-500 uppercase tracking-wider">Última Visita</th>
+                    <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-surface-500 uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-200">

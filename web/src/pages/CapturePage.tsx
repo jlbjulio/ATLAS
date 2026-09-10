@@ -29,8 +29,10 @@ export function CapturePage() {
   const [formInstance, setFormInstance] = useState(0);
   const [lastFormData, setLastFormData] = useState<CaptureFormData | null>(null);
   const [lastExtraction, setLastExtraction] = useState<QVACExtractionResult | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleExtract = async (formData: CaptureFormData): Promise<QVACExtractionResult> => {
+    setActionError(null);
     if (!isInitialized) {
       await initialize();
     }
@@ -42,6 +44,7 @@ export function CapturePage() {
   };
 
   const handleSubmit = async (formData: CaptureFormData, extraction: QVACExtractionResult) => {
+    setActionError(null);
     setIsSubmitting(true);
     try {
       await createObservation(formData, extraction, 'user-demo', 'Usuario Demo');
@@ -57,6 +60,11 @@ export function CapturePage() {
 
   const handleConfirm = async () => {
     if (!lastFormData || !lastExtraction) return;
+    setActionError(null);
+    if (lastFormData.imageUris?.length) {
+      setActionError('Revisa o retira las fotos antes de confirmar. No se admiten pacientes, expedientes, gafetes ni rostros.');
+      return;
+    }
     setIsConfirming(true);
     try {
       await confirmObservation('temp', lastFormData, lastExtraction);
@@ -124,11 +132,21 @@ export function CapturePage() {
       )}
 
       {!isInitialized && !initError && (
-        <div className="flex items-center gap-3 rounded-lg border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-accent-800">
+        <div className="flex items-center gap-3 rounded-lg border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-accent-800" role="status">
           <ShieldCheck className="h-5 w-5 shrink-0 text-accent-700" />
           <div>
-            <p className="font-medium">Listo para procesar localmente</p>
-            <p className="text-accent-700">La inferencia se activa cuando pulses Extraer.</p>
+            <p className="font-medium">Procesamiento local disponible</p>
+            <p className="text-accent-700">La verificación de QVAC se realizará al analizar la observación.</p>
+          </div>
+        </div>
+      )}
+
+      {isInitialized && (
+        <div className="flex items-center gap-3 rounded-lg border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-accent-800" role="status">
+          <ShieldCheck className="h-5 w-5 shrink-0 text-accent-700" />
+          <div>
+            <p className="font-medium">QVAC local verificado</p>
+            <p className="text-accent-700">La inferencia de esta captura se ejecutará en el dispositivo.</p>
           </div>
         </div>
       )}
@@ -148,6 +166,13 @@ export function CapturePage() {
         <div className="flex items-center gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-800" role="status">
           <CheckCircle className="h-4 w-4 shrink-0" />
           Borrador guardado localmente. Revisa los cambios y confirma para incorporarlo a la base instalada.
+        </div>
+      )}
+
+      {actionError && (
+        <div className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+          <p>{actionError}</p>
         </div>
       )}
 

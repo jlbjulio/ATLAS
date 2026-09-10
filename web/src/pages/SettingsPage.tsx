@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Database, Zap, Shield, Bell, Palette, Save } from "lucide-react";
+import { Database, Zap, Shield, Bell, Palette, Save, Sun, Moon, Monitor } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -17,6 +17,8 @@ export function SettingsPage() {
     "general" | "qvac" | "sync" | "appearance" | "notifications"
   >("general");
   const [isSaving, setIsSaving] = useState(false);
+  const [theme, setTheme] = useState("system");
+  const [density, setDensity] = useState("standard");
 
   const tabs = [
     { id: "general", label: "General", icon: Database },
@@ -304,9 +306,10 @@ export function SettingsPage() {
                 </div>
 
                 <div className="border-t border-surface-200 pt-6">
-                  <h4 className="font-medium text-surface-900 mb-4">
-                    P2P / Delegated Inference
-                  </h4>
+                  <div className="mb-4 flex items-center gap-3">
+                    <h4 className="font-medium text-surface-900">P2P / Delegated Inference</h4>
+                    <Badge variant="default" size="sm">Móvil / roadmap</Badge>
+                  </div>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <input
@@ -467,19 +470,22 @@ export function SettingsPage() {
                   <label className="label">Tema</label>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {[
-                      { value: "light", label: "Claro", icon: "☀️" },
-                      { value: "dark", label: "Oscuro", icon: "🌙" },
-                      { value: "system", label: "Sistema", icon: "💻" },
-                    ].map((theme) => (
+                      { value: "light", label: "Claro", icon: Sun },
+                      { value: "dark", label: "Oscuro", icon: Moon },
+                      { value: "system", label: "Sistema", icon: Monitor },
+                    ].map((themeOption) => (
                       <button
-                        key={theme.value}
-                        className={`p-4 rounded-lg border-2 text-center transition-colors ${theme.value === "system" ? "border-primary-500 bg-primary-50" : "border-surface-200 hover:border-surface-300"}`}
+                        key={themeOption.value}
+                        type="button"
+                        onClick={() => setTheme(themeOption.value)}
+                        aria-pressed={theme === themeOption.value}
+                        className={`p-4 rounded-lg border-2 text-center transition-colors ${theme === themeOption.value ? "border-primary-500 bg-primary-50" : "border-surface-200 hover:border-surface-300"}`}
                       >
-                        <span className="text-2xl block mb-1">
-                          {theme.icon}
+                        <span className="mb-1 block">
+                          <themeOption.icon className="mx-auto h-6 w-6 text-primary-600" />
                         </span>
                         <span className="font-medium text-surface-900">
-                          {theme.label}
+                          {themeOption.label}
                         </span>
                       </button>
                     ))}
@@ -505,16 +511,19 @@ export function SettingsPage() {
                         label: "Compacta",
                         desc: "Más datos",
                       },
-                    ].map((density) => (
+                    ].map((densityOption) => (
                       <button
-                        key={density.value}
-                        className={`p-4 rounded-lg border-2 text-center transition-colors ${density.value === "standard" ? "border-primary-500 bg-primary-50" : "border-surface-200 hover:border-surface-300"}`}
+                        key={densityOption.value}
+                        type="button"
+                        onClick={() => setDensity(densityOption.value)}
+                        aria-pressed={density === densityOption.value}
+                        className={`p-4 rounded-lg border-2 text-center transition-colors ${density === densityOption.value ? "border-primary-500 bg-primary-50" : "border-surface-200 hover:border-surface-300"}`}
                       >
                         <span className="font-medium text-surface-900">
-                          {density.label}
+                          {densityOption.label}
                         </span>
                         <p className="text-xs text-surface-500">
-                          {density.desc}
+                          {densityOption.desc}
                         </p>
                       </button>
                     ))}

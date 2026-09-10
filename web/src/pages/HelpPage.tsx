@@ -159,18 +159,6 @@ const resources = [
     icon: Github,
     desc: "Código fuente y issues",
   },
-  {
-    title: "Especificación de Datos",
-    url: "/spec",
-    icon: BookOpen,
-    desc: "Esquemas JSON para observaciones y equipos",
-  },
-  {
-    title: "Changelog",
-    url: "/changelog",
-    icon: Clock,
-    desc: "Historial de versiones y cambios",
-  },
 ];
 
 export function HelpPage() {
