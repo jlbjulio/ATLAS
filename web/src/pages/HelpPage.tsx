@@ -133,8 +133,8 @@ const faqs = [
     a: "Usa QVAC SDK con: Qwen3 0.6B para extracción de equipos, Whisper Small para transcripción de voz, y EmbeddingGemma para búsquedas semánticas. Todos corren localmente via llama.cpp / whisper.cpp.",
   },
   {
-    q: "¿Cómo funciona la inferencia P2P delegada?",
-    a: 'La laptop del hospital actúa como "provider" QVAC (startQVACProvider). El móvil se conecta via Hyperswarm DHT y delega tareas pesadas (visión, embeddings grandes) a la laptop. Si falla, cae a inferencia local (fallbackToLocal).',
+    q: "¿Cómo funciona la potencia compartida?",
+    a: "La laptop puede compartir su procesador con el móvil. Desde el dashboard se genera un código QR; al escanearlo desde ATLAS Field, ambos dispositivos se enlazan en la misma red Wi-Fi. ATLAS delega automáticamente texto y audio a la laptop más potente, y si la conexión falla continúa en el móvil.",
   },
   {
     q: "¿Puedo usar ATLAS en móvil?",
