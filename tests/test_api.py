@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from atlas.infrastructure.database.sqlite import SQLiteDatabase
 from web.server import main as api_server
-from web.server.main import app, get_database
+from web.server.main import app, get_database, get_qvac_runtime
 
 
 def test_api_returns_seeded_inventory(tmp_path: Path) -> None:
@@ -72,3 +72,43 @@ def test_transcription_reports_unavailable_local_model(tmp_path: Path, monkeypat
 
     assert response.status_code == 503
     assert response.json()["detail"]["missing_models"] == ["whisper-small", "silero-vad"]
+
+
+def _transcribe_with_runtime(runtime, filename: str, payload: bytes) -> dict:
+    app.dependency_overrides[get_qvac_runtime] = lambda: runtime
+    try:
+        response = TestClient(app).post(
+            "/api/capture/transcribe",
+            files={"file": (filename, payload, "audio/webm")},
+        )
+        assert response.status_code == 200
+        return runtime.calls[0]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_transcription_rewrites_webm_to_decodable_ogg(tmp_path: Path) -> None:
+    class FakeRuntime:
+        calls: list[dict] = []
+
+        def run(self, command: str, **options) -> dict:
+            self.calls.append({"command": command, **options})
+            return {"text": "transcripción"}
+
+    call = _transcribe_with_runtime(FakeRuntime(), "recording.webm", b"fake-webm-bytes")
+
+    assert call["command"] == "transcribe"
+    assert Path(call["audio"]).suffix == ".ogg"
+
+
+def test_transcription_keeps_known_wav_suffix(tmp_path: Path) -> None:
+    class FakeRuntime:
+        calls: list[dict] = []
+
+        def run(self, command: str, **options) -> dict:
+            self.calls.append({"command": command, **options})
+            return {"text": "transcripción"}
+
+    call = _transcribe_with_runtime(FakeRuntime(), "recording.wav", b"RIFF")
+
+    assert Path(call["audio"]).suffix == ".wav"
