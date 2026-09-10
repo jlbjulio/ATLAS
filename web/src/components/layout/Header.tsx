@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import {
   LayoutDashboard,
   Database,
@@ -9,23 +9,23 @@ import {
   User,
   Menu,
   X,
-} from "lucide-react";
-import { Button } from "@/components/common";
+} from "lucide-react"
+import { Button } from "@/components/common"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Base Instalada", href: "/installed-base", icon: Database },
   { name: "Consultas NL", href: "/queries", icon: Search },
   { name: "Captura", href: "/capture", icon: Mic },
-];
+]
 
 export function Header() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-40 border-b border-surface-200 bg-white lg:ml-64">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-8">
@@ -34,7 +34,7 @@ export function Header() {
               className="flex items-center gap-2 lg:hidden"
               aria-label="ATLAS Home"
             >
-              <img src="/atlas.svg" alt="ATLAS" className="h-auto w-28" />
+              <img src="/atlas.svg" alt="ATLAS" className="h-auto w-28 brightness-0 invert" />
             </Link>
 
             <nav
@@ -45,29 +45,29 @@ export function Header() {
                 const isActive =
                   location.pathname === item.href ||
                   (item.href !== "/" &&
-                    location.pathname.startsWith(item.href));
+                    location.pathname.startsWith(item.href))
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                       isActive
-                        ? "bg-primary-50 text-primary-700"
-                        : "text-surface-600 hover:bg-surface-50 hover:text-surface-900"
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                     aria-current={isActive ? "page" : undefined}
                   >
                     <item.icon className="w-4 h-4" />
                     {item.name}
                   </Link>
-                );
+                )
               })}
             </nav>
           </div>
 
           <button
             type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-surface-700 hover:bg-surface-100 focus:outline-none focus:ring-2 focus:ring-primary-500 lg:hidden"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring lg:hidden"
             aria-label={isMobileNavOpen ? "Cerrar navegación" : "Abrir navegación"}
             aria-expanded={isMobileNavOpen}
             onClick={() => setIsMobileNavOpen((open) => !open)}
@@ -95,39 +95,43 @@ export function Header() {
                 aria-expanded="false"
                 aria-haspopup="true"
               >
-                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                  <User className="w-4 h-4 text-primary-700" />
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="w-4 h-4 text-primary" />
                 </div>
-                <span className="hidden md:block text-sm font-medium text-surface-700">
+                <span className="hidden md:block text-sm font-medium text-foreground">
                   Usuario Demo
                 </span>
-                <ChevronDown className="w-4 h-4 text-surface-500" />
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
               </Button>
             </div>
           </div>
         </div>
         {isMobileNavOpen && (
-          <nav className="border-t border-surface-200 py-3 lg:hidden" aria-label="Navegación móvil">
+          <nav className="border-t border-border py-3 lg:hidden" aria-label="Navegación móvil">
             <div className="grid gap-1">
               {navigation.map((item) => {
-                const isActive = location.pathname === item.href || (item.href !== "/" && location.pathname.startsWith(item.href));
+                const isActive = location.pathname === item.href || (item.href !== "/" && location.pathname.startsWith(item.href))
                 return (
                   <Link
                     key={item.name}
                     to={item.href}
                     onClick={() => setIsMobileNavOpen(false)}
-                    className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium ${isActive ? "bg-primary-50 text-primary-700" : "text-surface-600 hover:bg-surface-50"}`}
+                    className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium ${
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted"
+                    }`}
                     aria-current={isActive ? "page" : undefined}
                   >
                     <item.icon className="h-4 w-4" />
                     {item.name}
                   </Link>
-                );
+                )
               })}
             </div>
           </nav>
         )}
       </div>
     </header>
-  );
+  )
 }

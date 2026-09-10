@@ -1,5 +1,15 @@
-import { useState } from "react";
-import { Database, Zap, Shield, Bell, Palette, Save, Sun, Moon, Monitor } from "lucide-react";
+import { useState } from "react"
+import {
+  Database,
+  Zap,
+  Shield,
+  Bell,
+  Palette,
+  Save,
+  Sun,
+  Moon,
+  Monitor,
+} from "lucide-react"
 import {
   Card,
   CardHeader,
@@ -10,15 +20,15 @@ import {
   Input,
   Select,
   Badge,
-} from "@/components/common";
+} from "@/components/common"
 
 export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
     "general" | "qvac" | "sync" | "appearance" | "notifications"
-  >("general");
-  const [isSaving, setIsSaving] = useState(false);
-  const [theme, setTheme] = useState("system");
-  const [density, setDensity] = useState("standard");
+  >("general")
+  const [isSaving, setIsSaving] = useState(false)
+  const [theme, setTheme] = useState("system")
+  const [density, setDensity] = useState("standard")
 
   const tabs = [
     { id: "general", label: "General", icon: Database },
@@ -26,19 +36,19 @@ export function SettingsPage() {
     { id: "sync", label: "Sincronización", icon: Shield },
     { id: "appearance", label: "Apariencia", icon: Palette },
     { id: "notifications", label: "Notificaciones", icon: Bell },
-  ];
+  ]
 
   const handleSave = async () => {
-    setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
-  };
+    setIsSaving(true)
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    setIsSaving(false)
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-surface-900">Configuración</h1>
-        <p className="mt-1 text-surface-500">
+        <h1 className="text-3xl font-bold text-foreground">Configuración</h1>
+        <p className="mt-1 text-muted-foreground">
           Personaliza tu experiencia en ATLAS
         </p>
       </div>
@@ -52,8 +62,8 @@ export function SettingsPage() {
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     activeTab === tab.id
-                      ? "bg-primary-50 text-primary-700"
-                      : "text-surface-600 hover:bg-surface-50 hover:text-surface-900"
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   <tab.icon className="w-5 h-5" />
@@ -67,7 +77,7 @@ export function SettingsPage() {
         <div className="flex-1">
           {activeTab === "general" && (
             <>
-              <Card>
+              <Card className="mb-6">
                 <CardHeader>
                   <CardTitle>Información del Usuario</CardTitle>
                   <CardDescription>
@@ -76,10 +86,7 @@ export function SettingsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Input
-                      label="Nombre completo"
-                      defaultValue="Usuario Demo"
-                    />
+                    <Input label="Nombre completo" defaultValue="Usuario Demo" />
                     <Input
                       label="Email"
                       type="email"
@@ -89,32 +96,26 @@ export function SettingsPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Select
                       label="Rol"
+                      value="field_engineer"
                       options={[
-                        {
-                          value: "field_engineer",
-                          label: "Ingeniero de Campo",
-                        },
+                        { value: "field_engineer", label: "Ingeniero de Campo" },
                         { value: "sales", label: "Ventas" },
                         { value: "specialist", label: "Especialista" },
                         { value: "admin", label: "Administrador" },
                       ]}
-                      value="field_engineer"
                     />
                     <Select
                       label="Región"
+                      value="latam"
                       options={[
                         { value: "latam", label: "Latinoamérica" },
                         { value: "north_america", label: "Norteamérica" },
                         { value: "europe", label: "Europa" },
                         { value: "apac", label: "APAC" },
                       ]}
-                      value="latam"
                     />
                   </div>
-                  <Input
-                    label="Organización"
-                    defaultValue="Philips Healthcare"
-                  />
+                  <Input label="Organización" defaultValue="Philips Healthcare" />
                 </CardContent>
               </Card>
 
@@ -129,64 +130,52 @@ export function SettingsPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Select
                       label="Idioma por defecto"
+                      value="es"
                       options={[
                         { value: "es", label: "Español" },
                         { value: "en", label: "English" },
                         { value: "pt", label: "Português" },
                       ]}
-                      value="es"
                     />
                     <Select
                       label="Unidad de medida"
+                      value="metric"
                       options={[
                         { value: "metric", label: "Métrico (años)" },
                         { value: "imperial", label: "Imperial" },
                       ]}
-                      value="metric"
                     />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="auto-extract"
-                      defaultChecked
-                      className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <label
-                      htmlFor="auto-extract"
-                      className="text-sm text-surface-700"
-                    >
-                      Extraer información automáticamente al terminar la captura
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="voice-enabled"
-                      defaultChecked
-                      className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <label
-                      htmlFor="voice-enabled"
-                      className="text-sm text-surface-700"
-                    >
-                      Habilitar captura por voz (requiere micrófono)
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="photo-enabled"
-                      defaultChecked
-                      className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <label
-                      htmlFor="photo-enabled"
-                      className="text-sm text-surface-700"
-                    >
-                      Permitir adjuntar fotos de placas/etiquetas
-                    </label>
-                  </div>
+                  {[
+                    {
+                      id: "auto-extract",
+                      label:
+                        "Extraer información automáticamente al terminar la captura",
+                      defaultChecked: true,
+                    },
+                    {
+                      id: "voice-enabled",
+                      label: "Habilitar captura por voz (requiere micrófono)",
+                      defaultChecked: true,
+                    },
+                    {
+                      id: "photo-enabled",
+                      label: "Permitir adjuntar fotos de placas/etiquetas",
+                      defaultChecked: true,
+                    },
+                  ].map((item) => (
+                    <div key={item.id} className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id={item.id}
+                        defaultChecked={item.defaultChecked}
+                        className="w-4 h-4 rounded border-input text-primary focus:ring-ring"
+                      />
+                      <label htmlFor={item.id} className="text-sm text-muted-foreground">
+                        {item.label}
+                      </label>
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             </>
@@ -202,7 +191,7 @@ export function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <h4 className="font-medium text-surface-900 mb-4">
+                  <h4 className="font-medium text-foreground mb-4">
                     Modelos de Inferencia
                   </h4>
                   <div className="space-y-4">
@@ -228,13 +217,13 @@ export function SettingsPage() {
                     ].map((model) => (
                       <div
                         key={model.model}
-                        className="flex items-center justify-between p-4 bg-surface-50 rounded-lg border border-surface-200"
+                        className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border"
                       >
                         <div className="flex-1">
-                          <p className="font-medium text-surface-900">
+                          <p className="font-medium text-foreground">
                             {model.name}
                           </p>
-                          <p className="text-sm text-surface-500">
+                          <p className="text-sm text-muted-foreground">
                             {model.model} · {model.size} · {model.type}
                           </p>
                         </div>
@@ -244,13 +233,13 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-surface-200 pt-6">
-                  <h4 className="font-medium text-surface-900 mb-4">
+                <div className="border-t border-border pt-6">
+                  <h4 className="font-medium text-foreground mb-4">
                     Parámetros de Inferencia
                   </h4>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="label">Temperatura (creatividad)</label>
+                      <label className="label-base">Temperatura (creatividad)</label>
                       <input
                         type="range"
                         min="0"
@@ -259,70 +248,48 @@ export function SettingsPage() {
                         defaultValue={0.1}
                         className="w-full"
                       />
-                      <p className="text-xs text-surface-500 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         0.1 - Determinista, extracción precisa
                       </p>
                     </div>
                     <div>
-                      <label className="label">Max Tokens</label>
-                      <input
-                        type="number"
-                        min="512"
-                        max="4096"
-                        step="512"
-                        defaultValue={2048}
-                        className="input"
-                      />
+                      <label className="label-base">Max Tokens</label>
+                      <Input type="number" min={512} max={4096} step={512} defaultValue={2048} />
                     </div>
                     <div>
-                      <label className="label">Device Preference</label>
                       <Select
+                        label="Device Preference"
+                        value="auto"
                         options={[
-                          {
-                            value: "cpu",
-                            label: "CPU (compatible, más lento)",
-                          },
-                          {
-                            value: "gpu",
-                            label: "GPU (más rápido, requiere hardware)",
-                          },
+                          { value: "cpu", label: "CPU (compatible, más lento)" },
+                          { value: "gpu", label: "GPU (más rápido, requiere hardware)" },
                           { value: "auto", label: "Auto (recomendado)" },
                         ]}
-                        value="auto"
                       />
                     </div>
                     <div>
-                      <label className="label">Contexto máximo</label>
-                      <input
-                        type="number"
-                        min="1024"
-                        max="8192"
-                        step="1024"
-                        defaultValue={4096}
-                        className="input"
-                      />
+                      <label className="label-base">Contexto máximo</label>
+                      <Input type="number" min={1024} max={8192} step={1024} defaultValue={4096} />
                     </div>
                   </div>
                 </div>
 
-                <div className="border-t border-surface-200 pt-6">
+                <div className="border-t border-border pt-6">
                   <div className="mb-4 flex items-center gap-3">
-                    <h4 className="font-medium text-surface-900">P2P / Delegated Inference</h4>
-                    <Badge variant="default" size="sm">Móvil / roadmap</Badge>
+                    <h4 className="font-medium text-foreground">
+                      P2P / Delegated Inference
+                    </h4>
+                    <Badge variant="info">Móvil / roadmap</Badge>
                   </div>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <input
                         type="checkbox"
                         id="p2p-enabled"
-                        className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
+                        className="w-4 h-4 rounded border-input text-primary focus:ring-ring"
                       />
-                      <label
-                        htmlFor="p2p-enabled"
-                        className="text-sm text-surface-700"
-                      >
-                        Habilitar inferencia delegada P2P (laptop como
-                        proveedor)
+                      <label htmlFor="p2p-enabled" className="text-sm text-muted-foreground">
+                        Habilitar inferencia delegada P2P (laptop como proveedor)
                       </label>
                     </div>
                     <Input
@@ -341,14 +308,10 @@ export function SettingsPage() {
                         type="checkbox"
                         id="fallback-local"
                         defaultChecked
-                        className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
+                        className="w-4 h-4 rounded border-input text-primary focus:ring-ring"
                       />
-                      <label
-                        htmlFor="fallback-local"
-                        className="text-sm text-surface-700"
-                      >
-                        Fallback a inferencia local automático (recomendado para
-                        robustez offline)
+                      <label htmlFor="fallback-local" className="text-sm text-muted-foreground">
+                        Fallback a inferencia local automático (recomendado para robustez offline)
                       </label>
                     </div>
                   </div>
@@ -367,7 +330,7 @@ export function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <h4 className="font-medium text-surface-900 mb-4">
+                  <h4 className="font-medium text-foreground mb-4">
                     Backend Local (Python)
                   </h4>
                   <div className="space-y-4">
@@ -379,45 +342,41 @@ export function SettingsPage() {
                       label="WebSocket URL"
                       defaultValue="ws://localhost:8000/ws"
                     />
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        id="auto-sync"
-                        defaultChecked
-                        className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <label
-                        htmlFor="auto-sync"
-                        className="text-sm text-surface-700"
-                      >
-                        Sincronizar automáticamente al detectar conexión
-                      </label>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        id="offline-first"
-                        defaultChecked
-                        className="w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <label
-                        htmlFor="offline-first"
-                        className="text-sm text-surface-700"
-                      >
-                        Modo offline-first (guardar local, sincronizar después)
-                      </label>
-                    </div>
+                    {[
+                      {
+                        id: "auto-sync",
+                        label: "Sincronizar automáticamente al detectar conexión",
+                        defaultChecked: true,
+                      },
+                      {
+                        id: "offline-first",
+                        label: "Modo offline-first (guardar local, sincronizar después)",
+                        defaultChecked: true,
+                      },
+                    ].map((item) => (
+                      <div key={item.id} className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          id={item.id}
+                          defaultChecked={item.defaultChecked}
+                          className="w-4 h-4 rounded border-input text-primary focus:ring-ring"
+                        />
+                        <label htmlFor={item.id} className="text-sm text-muted-foreground">
+                          {item.label}
+                        </label>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="border-t border-surface-200 pt-6">
-                  <h4 className="font-medium text-surface-900 mb-4">
+                <div className="border-t border-border pt-6">
+                  <h4 className="font-medium text-foreground mb-4">
                     Outbox / Cola de Sincronización
                   </h4>
                   <div className="space-y-3">
-                    <p className="text-sm text-surface-600">
+                    <p className="text-sm text-muted-foreground">
                       Observaciones pendientes de sincronizar:{" "}
-                      <span className="font-medium text-primary-600">3</span>
+                      <span className="font-medium text-primary">3</span>
                     </p>
                     <div className="flex gap-3">
                       <Button variant="secondary" size="sm">
@@ -430,29 +389,28 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-surface-200 pt-6">
-                  <h4 className="font-medium text-surface-900 mb-4">
+                <div className="border-t border-border pt-6">
+                  <h4 className="font-medium text-foreground mb-4">
                     Almacenamiento Local
                   </h4>
                   <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="p-4 bg-surface-50 rounded-lg border border-surface-200 text-center">
-                      <p className="text-2xl font-bold text-surface-900">
-                        2.4 MB
-                      </p>
-                      <p className="text-sm text-surface-500">SQLite Local</p>
-                    </div>
-                    <div className="p-4 bg-surface-50 rounded-lg border border-surface-200 text-center">
-                      <p className="text-2xl font-bold text-surface-900">
-                        18 MB
-                      </p>
-                      <p className="text-sm text-surface-500">Modelos QVAC</p>
-                    </div>
-                    <div className="p-4 bg-surface-50 rounded-lg border border-surface-200 text-center">
-                      <p className="text-2xl font-bold text-surface-900">
-                        5.2 MB
-                      </p>
-                      <p className="text-sm text-surface-500">Cache / Assets</p>
-                    </div>
+                    {[
+                      { value: "2.4 MB", label: "SQLite Local" },
+                      { value: "18 MB", label: "Modelos QVAC" },
+                      { value: "5.2 MB", label: "Cache / Assets" },
+                    ].map((stat) => (
+                      <div
+                        key={stat.label}
+                        className="p-4 bg-muted rounded-lg border border-border text-center"
+                      >
+                        <p className="text-2xl font-bold text-foreground">
+                          {stat.value}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {stat.label}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </CardContent>
@@ -467,7 +425,7 @@ export function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <label className="label">Tema</label>
+                  <label className="label-base mb-3 block">Tema</label>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {[
                       { value: "light", label: "Claro", icon: Sun },
@@ -479,12 +437,22 @@ export function SettingsPage() {
                         type="button"
                         onClick={() => setTheme(themeOption.value)}
                         aria-pressed={theme === themeOption.value}
-                        className={`p-4 rounded-lg border-2 text-center transition-colors ${theme === themeOption.value ? "border-primary-500 bg-primary-50" : "border-surface-200 hover:border-surface-300"}`}
+                        className={`p-4 rounded-lg border-2 text-center transition-colors ${
+                          theme === themeOption.value
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-muted-foreground"
+                        }`}
                       >
                         <span className="mb-1 block">
-                          <themeOption.icon className="mx-auto h-6 w-6 text-primary-600" />
+                          <themeOption.icon
+                            className={`mx-auto h-6 w-6 ${
+                              theme === themeOption.value
+                                ? "text-primary"
+                                : "text-muted-foreground"
+                            }`}
+                          />
                         </span>
-                        <span className="font-medium text-surface-900">
+                        <span className="font-medium text-foreground">
                           {themeOption.label}
                         </span>
                       </button>
@@ -492,15 +460,13 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-surface-200 pt-6">
-                  <label className="label">Densidad de Información</label>
+                <div className="border-t border-border pt-6">
+                  <label className="label-base mb-3 block">
+                    Densidad de Información
+                  </label>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {[
-                      {
-                        value: "comfortable",
-                        label: "Cómoda",
-                        desc: "Más espacio",
-                      },
+                      { value: "comfortable", label: "Cómoda", desc: "Más espacio" },
                       {
                         value: "standard",
                         label: "Estándar",
@@ -517,12 +483,16 @@ export function SettingsPage() {
                         type="button"
                         onClick={() => setDensity(densityOption.value)}
                         aria-pressed={density === densityOption.value}
-                        className={`p-4 rounded-lg border-2 text-center transition-colors ${density === densityOption.value ? "border-primary-500 bg-primary-50" : "border-surface-200 hover:border-surface-300"}`}
+                        className={`p-4 rounded-lg border-2 text-center transition-colors ${
+                          density === densityOption.value
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-muted-foreground"
+                        }`}
                       >
-                        <span className="font-medium text-surface-900">
+                        <span className="font-medium text-foreground">
                           {densityOption.label}
                         </span>
-                        <p className="text-xs text-surface-500">
+                        <p className="text-xs text-muted-foreground">
                           {densityOption.desc}
                         </p>
                       </button>
@@ -537,7 +507,9 @@ export function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Notificaciones</CardTitle>
-                <CardDescription>Configura qué alertas recibes</CardDescription>
+                <CardDescription>
+                  Configura qué alertas recibes
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {[
@@ -574,13 +546,15 @@ export function SettingsPage() {
                 ].map((notif, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between p-3 bg-surface-50 rounded-lg border border-surface-200"
+                    className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border"
                   >
                     <div className="flex-1">
-                      <p className="font-medium text-surface-900">
+                      <p className="font-medium text-foreground">
                         {notif.label}
                       </p>
-                      <p className="text-sm text-surface-500">{notif.desc}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {notif.desc}
+                      </p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -588,7 +562,7 @@ export function SettingsPage() {
                         defaultChecked={notif.default}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-surface-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                      <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
                   </div>
                 ))}
@@ -596,7 +570,7 @@ export function SettingsPage() {
             </Card>
           )}
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-surface-200">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button
               variant="secondary"
               onClick={handleSave}
@@ -609,5 +583,5 @@ export function SettingsPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -1,10 +1,10 @@
-import { Outlet } from "react-router-dom";
-import { Header } from "./Header";
-import { Sidebar } from "./Sidebar";
+import { Outlet } from "react-router-dom"
+import { Header } from "./Header"
+import { Sidebar } from "./Sidebar"
 
 export function MainLayout() {
   return (
-    <div className="min-h-screen bg-surface-50">
+    <div className="min-h-screen bg-background">
       <Sidebar />
       <Header />
       <div className="lg:pl-64">
@@ -13,5 +13,5 @@ export function MainLayout() {
         </main>
       </div>
     </div>
-  );
+  )
 }
