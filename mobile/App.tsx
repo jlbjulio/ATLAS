@@ -53,13 +53,6 @@ const COLORS = {
   green: "#2C8059",
 };
 
-const EMPTY_EXTRACTION: Extraction = {
-  equipments: [],
-  missingFields: [],
-  nextQuestion: null,
-  confidence: 0,
-};
-
 const FIELD_LABELS: Record<string, string> = {
   ageYears: "antigüedad",
   brand: "marca",

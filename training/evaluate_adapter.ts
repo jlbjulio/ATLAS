@@ -10,7 +10,7 @@ type ModelConfig = {
   models: {
     extraction: {
       path: string;
-      lora_path: string;
+      optional_lora_path: string;
       quantization: string;
     };
   };
@@ -24,7 +24,9 @@ const schemaPath = resolve(
 );
 const configPath = resolve(root, "config/models.json");
 const reportPath = resolve(root, "training/output/evaluation.json");
-const limitArgument = process.argv.find((value) => value.startsWith("--limit="));
+const limitArgument = process.argv.find((value) =>
+  value.startsWith("--limit="),
+);
 const limit = limitArgument ? Number(limitArgument.split("=")[1]) : 36;
 
 function compare(expected: unknown, actual: unknown): [number, number] {
@@ -33,7 +35,10 @@ function compare(expected: unknown, actual: unknown): [number, number] {
     let correct = expected.length === actual.length ? 1 : 0;
     let total = 1;
     for (let index = 0; index < expected.length; index += 1) {
-      const [nestedCorrect, nestedTotal] = compare(expected[index], actual[index]);
+      const [nestedCorrect, nestedTotal] = compare(
+        expected[index],
+        actual[index],
+      );
       correct += nestedCorrect;
       total += nestedTotal;
     }
@@ -47,7 +52,10 @@ function compare(expected: unknown, actual: unknown): [number, number] {
     let total = 0;
     for (const [key, value] of Object.entries(expected)) {
       if (key === "next_question") {
-        correct += Boolean(value) === Boolean((actual as Record<string, unknown>)[key]) ? 1 : 0;
+        correct +=
+          Boolean(value) === Boolean((actual as Record<string, unknown>)[key])
+            ? 1
+            : 0;
         total += 1;
         continue;
       }
@@ -70,7 +78,7 @@ const schema = JSON.parse(await readFile(schemaPath, "utf8")) as Record<
 >;
 const spec = config.models.extraction;
 const modelPath = resolve(root, spec.path);
-const adapterPath = resolve(root, spec.lora_path);
+const adapterPath = resolve(root, spec.optional_lora_path);
 await access(modelPath);
 await access(adapterPath);
 
@@ -95,10 +103,15 @@ try {
   });
   for (let index = 0; index < examples.length; index += 1) {
     const example = examples[index];
-    const system = example.messages.find((message) => message.role === "system");
+    const system = example.messages.find(
+      (message) => message.role === "system",
+    );
     const user = example.messages.find((message) => message.role === "user");
-    const answer = example.messages.find((message) => message.role === "assistant");
-    if (!system || !user || !answer) throw new Error(`Invalid test case ${index}`);
+    const answer = example.messages.find(
+      (message) => message.role === "assistant",
+    );
+    if (!system || !user || !answer)
+      throw new Error(`Invalid test case ${index}`);
     const run = completion({
       modelId,
       history: [system, user],
@@ -158,7 +171,7 @@ const report = {
   evaluated_at: new Date().toISOString(),
   hardware: `${platform()}-${arch()}`,
   model: spec.path,
-  adapter: spec.lora_path,
+  adapter: spec.optional_lora_path,
   quantization: spec.quantization,
   held_out_examples: examples.length,
   valid_json_rate: examples.length ? validResponses / examples.length : 0,

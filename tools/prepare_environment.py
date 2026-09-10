@@ -40,7 +40,11 @@ def validate_models() -> None:
     missing: list[str] = []
     for model in config["models"].values():
         for key, value in model.items():
-            if isinstance(value, str) and (key.endswith("path") or key in {"euro", "afri"}):
+            if (
+                isinstance(value, str)
+                and key.endswith("path")
+                and not key.startswith("optional_")
+            ):
                 if not (ROOT / value).exists():
                     missing.append(value)
     if missing:
