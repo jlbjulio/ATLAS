@@ -3,9 +3,9 @@
   "generated_by": "training/generate_dataset.py",
   "seed": 41021,
   "splits": {
-    "train": 60,
-    "validation": 12,
-    "test": 36
+    "train": "train.jsonl",
+    "validation": "validation.jsonl",
+    "test": "test.jsonl"
   },
   "languages": [
     "Spanish",

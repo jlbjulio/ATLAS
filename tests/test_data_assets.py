@@ -29,6 +29,8 @@ def test_finetuning_splits_are_valid() -> None:
                 "equipment",
                 "missing_fields",
                 "next_question",
+                "input_language",
+                "privacy_flags",
             }
 
 
