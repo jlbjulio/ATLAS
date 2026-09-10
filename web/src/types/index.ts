@@ -97,6 +97,7 @@ export interface QVACExtractionResult {
   confidence: number;
   missingFields: string[];
   followUpQuestions: string[];
+  draft: ObservationDraft;
 }
 
 export interface AppState {
@@ -110,8 +111,11 @@ export interface AppState {
 export interface CaptureFormData {
   rawText: string;
   audioUri?: string;
-  imageUris?: string[];
+  photo?: File;
+  photoPreview?: string;
+  photoAuthorized?: boolean;
   clientName?: string;
   city?: string;
   country?: string;
 }
+import type { ObservationDraft } from "@/services/api";

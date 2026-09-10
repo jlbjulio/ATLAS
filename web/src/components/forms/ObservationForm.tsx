@@ -92,7 +92,9 @@ export function ObservationForm({
     country: "",
     ...initialData,
   });
-  const [errors, setErrors] = useState<Partial<CaptureFormData>>({});
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof CaptureFormData, string>>
+  >({});
   const [isExtracting, setIsExtracting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -110,13 +112,14 @@ export function ObservationForm({
     return () => {
       mediaRecorderRef.current?.stop();
       streamRef.current?.getTracks().forEach((track) => track.stop());
+      if (formData.photoPreview) URL.revokeObjectURL(formData.photoPreview);
     };
-  }, []);
+  }, [formData.photoPreview]);
 
   const validateForm = (): boolean => {
-    const newErrors: Partial<CaptureFormData> = {};
-    if (!formData.rawText.trim()) {
-      newErrors.rawText = "La observación es requerida";
+    const newErrors: Partial<Record<keyof CaptureFormData, string>> = {};
+    if (!formData.rawText.trim() && !formData.photo) {
+      newErrors.rawText = "Añade una observación o una foto autorizada";
     }
     if (!formData.clientName?.trim()) {
       newErrors.clientName = "El nombre del cliente es requerido";
@@ -141,8 +144,12 @@ export function ObservationForm({
   };
 
   const handleExtract = async () => {
-    if (!formData.rawText.trim()) {
-      setErrors({ rawText: "Escribe una observación primero" });
+    if (!formData.rawText.trim() && !formData.photo) {
+      setErrors({ rawText: "Añade una observación o una foto autorizada" });
+      return;
+    }
+    if (formData.photo && !formData.photoAuthorized) {
+      setErrors({ photoAuthorized: "Confirma que la foto está autorizada" });
       return;
     }
 
@@ -164,8 +171,9 @@ export function ObservationForm({
     if (!editableExtraction) return;
     const updatedExtraction = {
       ...editableExtraction,
-      equipments: editableExtraction.equipments.map((equipment, equipmentIndex) =>
-        equipmentIndex === index ? { ...equipment, ...changes } : equipment,
+      equipments: editableExtraction.equipments.map(
+        (equipment, equipmentIndex) =>
+          equipmentIndex === index ? { ...equipment, ...changes } : equipment,
       ),
     };
     setEditableExtraction(updatedExtraction);
@@ -198,7 +206,9 @@ export function ObservationForm({
           if (onTranscribe && chunks.length > 0) {
             setIsTranscribing(true);
             const blob = new Blob(chunks, { type: "audio/webm" });
-            const audioFile = new File([blob], `recording-${Date.now()}.webm`, { type: "audio/webm" });
+            const audioFile = new File([blob], `recording-${Date.now()}.webm`, {
+              type: "audio/webm",
+            });
             const transcribed = await onTranscribe(audioFile);
             setFormData((prev) => ({
               ...prev,
@@ -219,7 +229,9 @@ export function ObservationForm({
       };
 
       recorder.onerror = () => {
-        setVoiceError("La grabación se interrumpió. Revisa el permiso del micrófono.");
+        setVoiceError(
+          "La grabación se interrumpió. Revisa el permiso del micrófono.",
+        );
         setIsRecording(false);
         stream.getTracks().forEach((track) => track.stop());
         mediaRecorderRef.current = null;
@@ -230,7 +242,9 @@ export function ObservationForm({
       setIsRecording(true);
     } catch (error) {
       console.error("Microphone access failed:", error);
-      setVoiceError("No se pudo activar el micrófono. Revisa los permisos del navegador.");
+      setVoiceError(
+        "No se pudo activar el micrófono. Revisa los permisos del navegador.",
+      );
       setIsRecording(false);
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -242,24 +256,27 @@ export function ObservationForm({
     ? "Grabando... pulsa para detener"
     : isTranscribing
       ? "Transcribiendo localmente..."
-      : voiceError ?? "Dicta una observación y ATLAS la convertirá en texto";
+      : (voiceError ?? "Dicta una observación y ATLAS la convertirá en texto");
 
-  const handleFileUpload = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: "imageUris",
-  ) => {
-    const files = Array.from(e.target.files || []);
-    const urls = files.map((file) => URL.createObjectURL(file));
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (formData.photoPreview) URL.revokeObjectURL(formData.photoPreview);
     setFormData((prev) => ({
       ...prev,
-      [field]: [...(prev[field] || []), ...urls],
+      photo: file,
+      photoPreview: URL.createObjectURL(file),
+      photoAuthorized: false,
     }));
   };
 
-  const removeImage = (index: number) => {
+  const removeImage = () => {
+    if (formData.photoPreview) URL.revokeObjectURL(formData.photoPreview);
     setFormData((prev) => ({
       ...prev,
-      imageUris: prev.imageUris?.filter((_, i) => i !== index) || [],
+      photo: undefined,
+      photoPreview: undefined,
+      photoAuthorized: false,
     }));
   };
 
@@ -320,21 +337,28 @@ export function ObservationForm({
                   variant={isRecording ? "danger" : "ghost"}
                   size="sm"
                   onClick={handleRecordAudio}
-                   disabled={isExtracting || isTranscribing}
+                  disabled={isExtracting || isTranscribing}
                   aria-label={
                     isRecording
                       ? "Detener grabación"
                       : "Iniciar grabación por voz"
                   }
                 >
-                   {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  {isRecording ? (
+                    <Square className="h-4 w-4" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={handleExtract}
-                  disabled={isExtracting || !formData.rawText.trim()}
+                  disabled={
+                    isExtracting ||
+                    (!formData.rawText.trim() && !formData.photo)
+                  }
                   aria-label="Extraer información con IA"
                 >
                   {isExtracting ? (
@@ -348,7 +372,10 @@ export function ObservationForm({
                 </Button>
               </div>
             </div>
-            <p className={`mt-2 text-xs ${voiceError ? "text-red-600" : "text-surface-500"}`} role={voiceError ? "alert" : "status"}>
+            <p
+              className={`mt-2 text-xs ${voiceError ? "text-red-600" : "text-surface-500"}`}
+              role={voiceError ? "alert" : "status"}
+            >
               {voiceStatus}
             </p>
             {errors.rawText && (
@@ -365,30 +392,49 @@ export function ObservationForm({
             <input
               type="file"
               accept="image/*"
-              multiple
-              onChange={(e) => handleFileUpload(e, "imageUris")}
+              onChange={handleFileUpload}
               className="input cursor-pointer"
             />
-            {formData.imageUris && formData.imageUris.length > 0 && (
+            {formData.photoPreview && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {formData.imageUris.map((uri, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={uri}
-                      alt={`Foto ${index + 1}`}
-                      className="w-16 h-16 object-cover rounded-lg border border-surface-200"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(index)}
-                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                      aria-label={`Eliminar foto ${index + 1}`}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                <div className="relative group">
+                  <img
+                    src={formData.photoPreview}
+                    alt="Foto autorizada para análisis local"
+                    className="w-16 h-16 object-cover rounded-lg border border-surface-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Eliminar foto"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
+            )}
+            {formData.photo && (
+              <label className="mt-3 flex items-start gap-2 text-sm text-surface-700">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.photoAuthorized)}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      photoAuthorized: e.target.checked,
+                    }))
+                  }
+                  className="mt-1"
+                />
+                Confirmo que la foto está autorizada y no contiene pacientes,
+                expedientes, gafetes ni rostros.
+              </label>
+            )}
+            {errors.photoAuthorized && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {errors.photoAuthorized}
+              </p>
             )}
           </div>
 
@@ -487,6 +533,17 @@ export function ObservationForm({
                 ))}
               </div>
 
+              {editableExtraction.draft.privacy_flags.length > 0 && (
+                <div
+                  className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+                  role="alert"
+                >
+                  Se detectó contenido sensible:{" "}
+                  {editableExtraction.draft.privacy_flags.join(", ")}. Retira o
+                  redacta la foto antes de confirmar.
+                </div>
+              )}
+
               {(editableExtraction.missingFields.length > 0 ||
                 editableExtraction.followUpQuestions.length > 0) && (
                 <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -519,8 +576,15 @@ export function ObservationForm({
             <Button type="button" variant="secondary" onClick={onCancel}>
               Cancelar
             </Button>
-            <Button type="submit" loading={isLoading} disabled={isExtracting}>
-              Guardar borrador local
+            <Button
+              type="submit"
+              loading={isLoading}
+              disabled={
+                isExtracting ||
+                Boolean(editableExtraction?.draft.privacy_flags.length)
+              }
+            >
+              Confirmar y guardar
             </Button>
           </div>
         </form>

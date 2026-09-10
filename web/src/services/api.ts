@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 interface ApiError extends Error {
   status?: number;
@@ -9,7 +9,7 @@ interface ApiError extends Error {
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error: ApiError = new Error('API request failed');
+    const error: ApiError = new Error("API request failed");
     error.status = response.status;
     try {
       error.data = await response.json();
@@ -29,37 +29,66 @@ async function typedFetch<T>(url: string, options?: RequestInit): Promise<T> {
 export const api = {
   health: () => typedFetch<HealthResponse>(`${API_BASE}/health`),
 
-  installedBase: () => typedFetch<InstalledBaseClient[]>(`${API_BASE}/installed-base`),
+  installedBase: () =>
+    typedFetch<InstalledBaseClient[]>(`${API_BASE}/installed-base`),
 
   dashboard: () => typedFetch<DashboardStats>(`${API_BASE}/dashboard`),
 
-  extract: (payload: { text: string; client?: string; city?: string; country?: string }) =>
+  extract: (payload: {
+    text: string;
+    client?: string;
+    city?: string;
+    country?: string;
+  }) =>
     typedFetch<ExtractResponse>(`${API_BASE}/capture/extract`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }),
 
+  analyzePhoto: (
+    photo: File,
+    payload: {
+      text: string;
+      client?: string;
+      city?: string;
+      country?: string;
+      photoAuthorized: boolean;
+    },
+  ) => {
+    const formData = new FormData();
+    formData.append("file", photo);
+    formData.append("text", payload.text);
+    formData.append("photo_authorized", String(payload.photoAuthorized));
+    if (payload.client) formData.append("client", payload.client);
+    if (payload.city) formData.append("city", payload.city);
+    if (payload.country) formData.append("country", payload.country);
+    return typedFetch<ExtractResponse>(`${API_BASE}/capture/analyze-photo`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+
   transcribe: (audioFile: File) => {
     const formData = new FormData();
-    formData.append('file', audioFile);
+    formData.append("file", audioFile);
     return typedFetch<TranscribeResponse>(`${API_BASE}/capture/transcribe`, {
-      method: 'POST',
+      method: "POST",
       body: formData,
     });
   },
 
   confirm: (draft: Record<string, unknown>) =>
     typedFetch<ConfirmResponse>(`${API_BASE}/capture/confirm`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(draft),
     }),
 
   search: (question: string) =>
     typedFetch<SearchResponse>(`${API_BASE}/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
     }),
 };
@@ -69,6 +98,7 @@ export type HealthResponse = {
   models_exist: Record<string, boolean>;
   database: string;
   sqlite_version: string;
+  extraction_mode: "base" | "adapter";
 };
 
 export type InstalledBaseClient = {
@@ -122,7 +152,7 @@ export type CoreEquipment = {
   serial_number: string | null;
   age_years: number | null;
   installation_year: number | null;
-  status: 'Confirmado' | 'Reportado' | 'Estimado' | 'Desconocido';
+  status: "Confirmado" | "Reportado" | "Estimado" | "Desconocido";
   confidence: number | null;
   evidence_text: string | null;
   notes: string | null;
@@ -130,7 +160,7 @@ export type CoreEquipment = {
 
 export type Evidence = {
   id: string;
-  kind: 'text' | 'audio' | 'photo';
+  kind: "text" | "audio" | "photo";
   local_path: string | null;
   sha256: string | null;
   excerpt: string | null;

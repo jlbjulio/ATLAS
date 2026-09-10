@@ -11,7 +11,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -27,6 +27,7 @@ from atlas.application.capture import CaptureService  # noqa: E402
 from atlas.application.search import InventoryFilters, compile_filters  # noqa: E402
 from atlas.domain.observations import ObservationDraft  # noqa: E402
 from atlas.infrastructure.database.sqlite import SQLiteDatabase  # noqa: E402
+from atlas.infrastructure.qvac.pipeline import CapturePipeline  # noqa: E402
 from atlas.infrastructure.qvac.runtime import QvacRuntime  # noqa: E402
 from atlas.infrastructure.repositories.observations import ObservationRepository  # noqa: E402
 
@@ -36,6 +37,7 @@ class HealthResponse(BaseModel):
     models_exist: dict[str, bool]
     database: str
     sqlite_version: str
+    extraction_mode: str
 
 
 class ExtractRequest(BaseModel):
@@ -84,6 +86,8 @@ def get_model_files() -> dict[str, Path]:
         "whisper-small": PROJECT_ROOT / models["transcription"]["path"],
         "silero-vad": PROJECT_ROOT / models["transcription"]["vad_path"],
         "embeddinggemma-300m": PROJECT_ROOT / models["duplicates"]["path"],
+        "extraction-adapter": PROJECT_ROOT
+        / models["extraction"]["optional_lora_path"],
     }
 
 
@@ -123,6 +127,10 @@ def get_qvac_runtime() -> QvacRuntime:
     return QvacRuntime()
 
 
+def get_capture_pipeline() -> CapturePipeline:
+    return CapturePipeline()
+
+
 def get_observation_repo(
     db: Annotated[SQLiteDatabase, Depends(get_database)]
 ) -> ObservationRepository:
@@ -158,6 +166,7 @@ async def health() -> HealthResponse:
         models_exist=model_files,
         database="sqlite",
         sqlite_version="3.x",
+        extraction_mode="adapter" if model_files["extraction-adapter"] else "base",
     )
 
 
@@ -244,6 +253,63 @@ async def extract_equipment(
     }
 
     return ExtractResponse(draft=draft, missing_fields=missing, next_question=next_q)
+
+
+IMAGE_SUFFIXES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+MAX_PHOTO_BYTES = 15 * 1024 * 1024
+
+
+@app.post("/api/capture/analyze-photo", response_model=ExtractResponse)
+async def analyze_photo(
+    file: Annotated[UploadFile, File(...)],
+    photo_authorized: Annotated[bool, Form(...)],
+    text: Annotated[str, Form()] = "",
+    client: Annotated[str | None, Form()] = None,
+    city: Annotated[str | None, Form()] = None,
+    country: Annotated[str | None, Form()] = None,
+    pipeline: Annotated[CapturePipeline, Depends(get_capture_pipeline)] = None,
+) -> ExtractResponse:
+    if not photo_authorized:
+        raise HTTPException(
+            status_code=403,
+            detail="Debes confirmar que la foto está autorizada antes de analizarla.",
+        )
+    suffix = IMAGE_SUFFIXES.get(file.content_type or "")
+    if not suffix:
+        raise HTTPException(status_code=415, detail="Formato de foto no permitido.")
+    content = await file.read()
+    if not content or len(content) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=413, detail="La foto debe pesar entre 1 byte y 15 MB.")
+    require_models("visionpsy-nano", "visionpsy-mmproj")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+    try:
+        draft = pipeline.prepare(text=text, image_path=tmp_path, observer="web-user")
+        draft.client = client or None
+        draft.city = city or None
+        draft.country = country or None
+        return ExtractResponse(
+            draft=draft.model_dump(mode="json"),
+            missing_fields=draft.missing_fields,
+            next_question=draft.next_question,
+        )
+    except Exception as error:
+        logger.exception("Local photo analysis failed")
+        raise HTTPException(
+            status_code=500,
+            detail="El análisis local de la foto falló. Revisa el runtime QVAC.",
+        ) from error
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 @app.post("/api/capture/transcribe", response_model=TranscribeResponse)

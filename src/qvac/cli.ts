@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
@@ -25,17 +25,27 @@ function required(name: string): string {
 async function run(): Promise<void> {
   const command = process.argv[2];
   if (command === "health") {
-    const paths = [
-      "models/vision/visionpsy-nano-460m-flash-q4_k_m-imat.gguf",
-      "models/vision/mmproj-visionpsy-nano-460m-flash-q8.gguf",
-      "models/language/qwen3-0.6b-q4_0.gguf",
-      "models/speech/whisper-small-q8_0.bin",
-      "models/embeddings/embeddinggemma-300m-q8_0.gguf",
-    ];
+    const config = JSON.parse(readFileSync("config/models.json", "utf8")) as {
+      models: Record<string, Record<string, string>>;
+    };
+    const paths = Object.values(config.models).flatMap((model) =>
+      Object.entries(model)
+        .filter(
+          ([key, value]) => key.endsWith("path") && typeof value === "string",
+        )
+        .map(([, value]) => value),
+    );
     const files = Object.fromEntries(
       paths.map((path) => [path, existsSync(resolve(path))]),
     );
-    process.stdout.write(`${JSON.stringify({ local_only: true, files })}\n`);
+    const adapterPath = config.models.extraction.optional_lora_path;
+    process.stdout.write(
+      `${JSON.stringify({
+        local_only: true,
+        files,
+        extraction_mode: adapterPath && files[adapterPath] ? "adapter" : "base",
+      })}\n`,
+    );
     return;
   }
   if (command === "extract") {

@@ -18,7 +18,7 @@
     },
     "extraction": {
       "path": "models/language/qwen3-0.6b-q4_0.gguf",
-      "lora_path": "training/output/atlas-extraction-lora.gguf",
+      "optional_lora_path": "training/output/atlas-extraction-lora.gguf",
       "quantization": "Q4_0",
       "qvac_model_type": "llamacpp-completion"
     },

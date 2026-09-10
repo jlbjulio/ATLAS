@@ -1,13 +1,20 @@
-import { useState, useCallback } from 'react';
-import { api } from '@/services/api';
-import { mapHealth, mapExtractionResponse, mapTranscribeResponse } from '@/lib/mappers';
-import type { QVACExtractionResult, CaptureFormData } from '@/types';
+import { useState, useCallback } from "react";
+import { api } from "@/services/api";
+import {
+  mapHealth,
+  mapExtractionResponse,
+  mapTranscribeResponse,
+} from "@/lib/mappers";
+import type { QVACExtractionResult, CaptureFormData } from "@/types";
 
 export function useQVAC() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [extractionMode, setExtractionMode] = useState<
+    "base" | "adapter" | null
+  >(null);
 
   const initialize = useCallback(async () => {
     if (isInitialized || isInitializing) return;
@@ -19,13 +26,15 @@ export function useQVAC() {
       const response = await api.health();
       const health = mapHealth(response);
       if (!health.available) {
-        throw new Error('QVAC models not available. Run model download first.');
+        throw new Error("QVAC models not available. Run model download first.");
       }
+      setExtractionMode(health.extractionMode);
       setIsInitialized(true);
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Error initializing QVAC';
+      const msg =
+        error instanceof Error ? error.message : "Error initializing QVAC";
       setInitError(msg);
-      console.error('QVAC init error:', error);
+      console.error("QVAC init error:", error);
     } finally {
       setIsInitializing(false);
     }
@@ -41,20 +50,31 @@ export function useQVAC() {
     }
   }, []);
 
-  const extract = useCallback(async (formData: CaptureFormData): Promise<QVACExtractionResult> => {
-    setIsProcessing(true);
-    try {
-      const response = await api.extract({
-        text: formData.rawText,
-        client: formData.clientName,
-        city: formData.city,
-        country: formData.country,
-      });
-      return mapExtractionResponse(response);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, []);
+  const extract = useCallback(
+    async (formData: CaptureFormData): Promise<QVACExtractionResult> => {
+      setIsProcessing(true);
+      try {
+        const response = formData.photo
+          ? await api.analyzePhoto(formData.photo, {
+              text: formData.rawText,
+              client: formData.clientName,
+              city: formData.city,
+              country: formData.country,
+              photoAuthorized: Boolean(formData.photoAuthorized),
+            })
+          : await api.extract({
+              text: formData.rawText,
+              client: formData.clientName,
+              city: formData.city,
+              country: formData.country,
+            });
+        return mapExtractionResponse(response);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [],
+  );
 
   const cleanup = useCallback(async () => {
     setIsInitialized(false);
@@ -65,13 +85,10 @@ export function useQVAC() {
     isInitializing,
     initError,
     isProcessing,
-    providerPublicKey: null,
-    isProviderRunning: false,
+    extractionMode,
     initialize,
     transcribe,
     extract,
-    startProvider: async () => {},
-    stopProvider: async () => {},
     cleanup,
     available: true,
   };

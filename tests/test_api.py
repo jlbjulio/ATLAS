@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from atlas.infrastructure.database.sqlite import SQLiteDatabase
 from web.server import main as api_server
-from web.server.main import app, get_database, get_qvac_runtime
+from web.server.main import app, get_capture_pipeline, get_database, get_qvac_runtime
 
 
 def test_api_returns_seeded_inventory(tmp_path: Path) -> None:
@@ -39,6 +39,59 @@ def test_health_reports_configured_local_models() -> None:
     assert response.json()["local_only"] is True
     assert "qwen3-0.6b" in response.json()["models_exist"]
     assert "silero-vad" in response.json()["models_exist"]
+    assert response.json()["extraction_mode"] in {"base", "adapter"}
+
+
+def test_photo_analysis_requires_explicit_authorization() -> None:
+    response = TestClient(app).post(
+        "/api/capture/analyze-photo",
+        data={"photo_authorized": "false"},
+        files={"file": ("plate.jpg", b"image", "image/jpeg")},
+    )
+
+    assert response.status_code == 403
+
+
+def test_confirmation_rejects_sensitive_content() -> None:
+    response = TestClient(app).post(
+        "/api/capture/confirm",
+        json={"privacy_flags": ["face_detected"]},
+    )
+
+    assert response.status_code == 400
+    assert "sensitive visual content" in response.json()["detail"]
+
+
+def test_photo_analysis_uses_local_pipeline(tmp_path: Path) -> None:
+    class FakePipeline:
+        def prepare(self, **kwargs):
+            from atlas.domain.observations import Evidence, EvidenceKind, ObservationDraft
+
+            assert Path(kwargs["image_path"]).suffix == ".jpg"
+            return ObservationDraft(
+                raw_text=kwargs["text"],
+                evidence=[Evidence(kind=EvidenceKind.PHOTO, local_path=tmp_path / "photo.jpg")],
+            )
+
+    app.dependency_overrides[get_capture_pipeline] = lambda: FakePipeline()
+    try:
+        response = TestClient(app).post(
+            "/api/capture/analyze-photo",
+            data={
+                "photo_authorized": "true",
+                "text": "Placa autorizada",
+                "client": "Hospital Demo",
+                "city": "Panamá",
+                "country": "Panamá",
+            },
+            files={"file": ("plate.jpg", b"image", "image/jpeg")},
+        )
+        assert response.status_code == 200
+        draft = response.json()["draft"]
+        assert draft["client"] == "Hospital Demo"
+        assert draft["evidence"][0]["kind"] == "photo"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_search_reports_unavailable_local_model(tmp_path: Path, monkeypatch) -> None:
