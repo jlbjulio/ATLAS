@@ -21,6 +21,7 @@ import { Button } from '@/components/common';
 import { api, type DashboardStats } from '@/services/api';
 import { mapDashboard, mapInstalledBase } from '@/lib/mappers';
 import type { ClientInstalledBase } from '@/types';
+import { SharedPowerCard } from '@/components/shared/SharedPowerCard';
 
 interface DashboardStatsExtended extends DashboardStats {
   by_modality: Record<string, number>;
@@ -133,6 +134,8 @@ export function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      <SharedPowerCard />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

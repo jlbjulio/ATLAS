@@ -91,6 +91,13 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
     }),
+
+  createP2PInvitation: (localUrl: string) =>
+    typedFetch<P2PInvitationResponse>(`${API_BASE}/p2p/invite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ local_url: localUrl }),
+    }),
 };
 
 export type HealthResponse = {
@@ -187,6 +194,12 @@ export type SearchResponse = {
   results: SearchResult[];
   filters_applied: Record<string, unknown>;
   intent: string;
+};
+
+export type P2PInvitationResponse = {
+  code: string;
+  invite_url: string;
+  expires_at: string;
 };
 
 export type SearchResult = {
