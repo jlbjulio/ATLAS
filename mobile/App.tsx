@@ -1,6 +1,13 @@
 import { StatusBar } from "expo-status-bar";
-import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from "expo-audio";
+import {
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from "expo-audio";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { Directory, File, Paths } from "expo-file-system";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,16 +17,24 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { listObservations, saveObservation } from "./src/db";
-import { extractObservation, initializeQVAC, shutdownQVAC, transcribeObservation } from "./src/qvac";
+import {
+  extractObservation,
+  initializeQVAC,
+  shutdownQVAC,
+  transcribeObservation,
+} from "./src/qvac";
 import type { EquipmentDraft, Extraction, LocalObservation } from "./src/types";
 
 type Tab = "capture" | "base";
@@ -45,7 +60,27 @@ const EMPTY_EXTRACTION: Extraction = {
   confidence: 0,
 };
 
+const FIELD_LABELS: Record<string, string> = {
+  ageYears: "antigüedad",
+  brand: "marca",
+  city: "ciudad",
+  client: "cliente",
+  model: "modelo",
+  modality: "modalidad",
+  quantity: "cantidad",
+  serial: "número de serie",
+};
+
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <FieldApp />
+    </SafeAreaProvider>
+  );
+}
+
+function FieldApp() {
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>("capture");
   const [modelState, setModelState] = useState("Preparando inteligencia local");
   const [modelProgress, setModelProgress] = useState<number | null>(null);
@@ -59,6 +94,7 @@ export default function App() {
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [extraction, setExtraction] = useState<Extraction | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
 
@@ -70,11 +106,16 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
-    void listObservations().then((items) => mounted && setObservations(items)).catch(() => undefined);
+    void listObservations()
+      .then((items) => mounted && setObservations(items))
+      .catch(() => undefined);
     void (async () => {
       const permission = await AudioModule.requestRecordingPermissionsAsync();
       if (mounted) setMicPermission(permission.granted);
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
       try {
         await initializeQVAC((label, percentage) => {
           if (!mounted) return;
@@ -87,7 +128,10 @@ export default function App() {
           setModelProgress(null);
         }
       } catch (error) {
-        if (mounted) setModelError(error instanceof Error ? error.message : "No se pudo preparar QVAC");
+        if (mounted)
+          setModelError(
+            error instanceof Error ? error.message : "No se pudo preparar QVAC",
+          );
       }
     })();
     return () => {
@@ -97,6 +141,7 @@ export default function App() {
   }, []);
 
   async function toggleRecording() {
+    if (!isReady || isTranscribing) return;
     if (!micPermission) {
       const permission = await AudioModule.requestRecordingPermissionsAsync();
       setMicPermission(permission.granted);
@@ -104,9 +149,21 @@ export default function App() {
     }
     if (recorderState.isRecording) {
       await recorder.stop();
-      setAudioUri(recorder.uri ?? null);
+      const uri = recorder.uri;
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+      });
+      if (!uri) {
+        Alert.alert("No se pudo guardar el audio", "Intenta grabar de nuevo.");
+        return;
+      }
+      const savedAudioUri = persistRecording(uri);
+      setAudioUri(savedAudioUri);
+      await handleTranscribe(savedAudioUri);
       return;
     }
+    setAudioUri(null);
     await recorder.prepareToRecordAsync();
     recorder.record();
   }
@@ -127,15 +184,23 @@ export default function App() {
     }
   }
 
-  async function handleTranscribe() {
-    if (!audioUri || !isReady) return;
+  async function handleTranscribe(uri: string) {
+    if (!isReady) return;
+    setIsTranscribing(true);
     try {
       setModelState("Transcribiendo en el dispositivo");
-      const text = await transcribeObservation(audioUri);
-      setNote((current) => (current ? `${current} ${text}` : text));
+      const text = (await transcribeObservation(uri)).trim();
+      if (!text) throw new Error("No se detectó voz en la grabación");
+      setNote((current) => (current ? `${current}\n${text}` : text));
       setModelState("Inferencia local lista");
     } catch (error) {
-      Alert.alert("No se pudo transcribir", error instanceof Error ? error.message : "Error local de voz");
+      Alert.alert(
+        "No se pudo transcribir",
+        error instanceof Error ? error.message : "Error local de voz",
+      );
+      setModelState("Inferencia local lista");
+    } finally {
+      setIsTranscribing(false);
     }
   }
 
@@ -143,24 +208,43 @@ export default function App() {
     if (!note.trim() || !isReady) return;
     setIsExtracting(true);
     try {
-      setExtraction(await extractObservation(`Cliente: ${client}\nCiudad: ${city}\nObservación: ${note}`));
+      setModelState("Estructurando en el dispositivo");
+      setExtraction(
+        await extractObservation(
+          `Cliente: ${client}\nCiudad: ${city}\nObservación: ${note}`,
+        ),
+      );
+      setModelState("Inferencia local lista");
     } catch (error) {
-      Alert.alert("No se pudo estructurar", error instanceof Error ? error.message : "Error local de extracción");
+      Alert.alert(
+        "No se pudo estructurar",
+        error instanceof Error ? error.message : "Error local de extracción",
+      );
+      setModelState("Inferencia local lista");
     } finally {
       setIsExtracting(false);
     }
   }
 
   function updateEquipment(index: number, changes: Partial<EquipmentDraft>) {
-    setExtraction((current) => current ? {
-      ...current,
-      equipments: current.equipments.map((item, itemIndex) => itemIndex === index ? { ...item, ...changes } : item),
-    } : current);
+    setExtraction((current) =>
+      current
+        ? {
+            ...current,
+            equipments: current.equipments.map((item, itemIndex) =>
+              itemIndex === index ? { ...item, ...changes } : item,
+            ),
+          }
+        : current,
+    );
   }
 
   async function handleSave() {
     if (!extraction || !client.trim() || !city.trim()) {
-      Alert.alert("Falta información", "Indica cliente, ciudad y realiza la extracción antes de guardar.");
+      Alert.alert(
+        "Falta información",
+        "Indica cliente, ciudad y realiza la extracción antes de guardar.",
+      );
       return;
     }
     setIsSaving(true);
@@ -185,23 +269,36 @@ export default function App() {
       setAudioUri(null);
       setPhotoUri(null);
       setExtraction(null);
-      Alert.alert("Guardado en el dispositivo", "La observación quedó almacenada localmente y pendiente de sincronización.");
+      Alert.alert(
+        "Guardado en el dispositivo",
+        "La observación quedó almacenada localmente y pendiente de sincronización.",
+      );
     } catch (error) {
-      Alert.alert("No se pudo guardar", error instanceof Error ? error.message : "Error de almacenamiento local");
+      Alert.alert(
+        "No se pudo guardar",
+        error instanceof Error
+          ? error.message
+          : "Error de almacenamiento local",
+      );
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={[styles.safe, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
       <View style={styles.header}>
         <View>
           <Text style={styles.eyebrow}>ATLAS / FIELD INTELLIGENCE</Text>
           <Text style={styles.title}>Visita de campo</Text>
         </View>
-        <View style={[styles.statusDot, isReady ? styles.statusReady : styles.statusWaiting]} />
+        <View
+          style={[
+            styles.statusDot,
+            isReady ? styles.statusReady : styles.statusWaiting,
+          ]}
+        />
       </View>
 
       {modelError ? (
@@ -212,51 +309,149 @@ export default function App() {
       ) : (
         <View style={styles.modelBanner}>
           <View style={styles.modelCopy}>
-            <Text style={styles.modelTitle}>{isReady ? "Procesamiento local activo" : modelState}</Text>
-            <Text style={styles.modelText}>La evidencia no sale del dispositivo.</Text>
+            <Text style={styles.modelTitle}>
+              {isReady ? "Procesamiento local activo" : modelState}
+            </Text>
+            <Text style={styles.modelText}>
+              La evidencia no sale del dispositivo.
+            </Text>
           </View>
-          {modelProgress !== null && <Text style={styles.progress}>{modelProgress}%</Text>}
+          {modelProgress !== null && (
+            <Text style={styles.progress}>{modelProgress}%</Text>
+          )}
         </View>
       )}
 
       {tab === "capture" ? (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.hero}>
               <Text style={styles.heroKicker}>CAPTURA SIN CONEXIÓN</Text>
-              <Text style={styles.heroTitle}>Convierte una observación en una base verificable.</Text>
-              <Text style={styles.heroText}>Dicta, escribe o fotografía solo equipos y placas autorizadas. Revisa cada sugerencia antes de confirmarla.</Text>
+              <Text style={styles.heroTitle}>
+                Convierte una observación en una base verificable.
+              </Text>
+              <Text style={styles.heroText}>
+                Dicta, escribe o fotografía solo equipos y placas autorizadas.
+                Revisa cada sugerencia antes de confirmarla.
+              </Text>
             </View>
 
             <Text style={styles.sectionLabel}>01 / CONTEXTO DE VISITA</Text>
             <View style={styles.card}>
-              <TextInput value={client} onChangeText={setClient} placeholder="Cliente / hospital" placeholderTextColor={COLORS.muted} style={styles.input} />
-              <TextInput value={city} onChangeText={setCity} placeholder="Ciudad" placeholderTextColor={COLORS.muted} style={styles.input} />
+              <TextInput
+                value={client}
+                onChangeText={setClient}
+                placeholder="Cliente / hospital"
+                placeholderTextColor={COLORS.muted}
+                style={styles.input}
+              />
+              <TextInput
+                value={city}
+                onChangeText={setCity}
+                placeholder="Ciudad"
+                placeholderTextColor={COLORS.muted}
+                style={styles.input}
+              />
             </View>
 
             <Text style={styles.sectionLabel}>02 / EVIDENCIA</Text>
             <View style={styles.card}>
-              <TextInput value={note} onChangeText={setNote} placeholder="Ej. Vi un tomógrafo Philips de aproximadamente 8 años en imagenología..." placeholderTextColor={COLORS.muted} multiline style={[styles.input, styles.noteInput]} />
+              <TextInput
+                value={note}
+                onChangeText={setNote}
+                placeholder="Ej. Vi un tomógrafo Philips de aproximadamente 8 años en imagenología..."
+                placeholderTextColor={COLORS.muted}
+                multiline
+                style={[styles.input, styles.noteInput]}
+              />
               <View style={styles.actionRow}>
-                <Pressable onPress={toggleRecording} style={[styles.actionButton, recorderState.isRecording && styles.actionButtonActive]}>
-                  <Text style={styles.actionIcon}>{recorderState.isRecording ? "■" : "●"}</Text>
-                  <Text style={styles.actionLabel}>{recorderState.isRecording ? "Detener" : "Dictar"}</Text>
+                <Pressable
+                  accessibilityLabel={
+                    recorderState.isRecording
+                      ? "Detener dictado"
+                      : "Iniciar dictado"
+                  }
+                  disabled={!isReady || isTranscribing}
+                  onPress={toggleRecording}
+                  style={[
+                    styles.actionButton,
+                    recorderState.isRecording && styles.actionButtonActive,
+                    (!isReady || isTranscribing) && styles.disabledButton,
+                  ]}
+                >
+                  <Text style={styles.actionIcon}>
+                    {recorderState.isRecording ? "■" : "●"}
+                  </Text>
+                  <Text style={styles.actionLabel}>
+                    {recorderState.isRecording
+                      ? "Detener"
+                      : isTranscribing
+                        ? "Transcribiendo"
+                        : "Dictar"}
+                  </Text>
                 </Pressable>
                 <Pressable onPress={openCamera} style={styles.actionButton}>
                   <Text style={styles.actionIcon}>▣</Text>
-                  <Text style={styles.actionLabel}>{photoUri ? "Placa lista" : "Foto"}</Text>
+                  <Text style={styles.actionLabel}>
+                    {photoUri ? "Placa lista" : "Foto"}
+                  </Text>
                 </Pressable>
-                {audioUri && !recorderState.isRecording && <Pressable onPress={handleTranscribe} style={styles.transcribeButton}><Text style={styles.transcribeText}>Transcribir localmente</Text></Pressable>}
               </View>
-              {photoUri && <Text style={styles.evidenceNote}>Foto guardada como evidencia. Retira cualquier contenido sensible antes de confirmar.</Text>}
+              {recorderState.isRecording && (
+                <Text style={styles.recordingNote}>
+                  Grabando localmente. Toca Detener para transcribir
+                  automáticamente.
+                </Text>
+              )}
+              {audioUri && !recorderState.isRecording && !isTranscribing && (
+                <Text style={styles.audioNote}>
+                  Dictado transcrito localmente y añadido a la observación.
+                </Text>
+              )}
+              {photoUri && (
+                <Text style={styles.evidenceNote}>
+                  Foto guardada como evidencia. Retira cualquier contenido
+                  sensible antes de confirmar.
+                </Text>
+              )}
             </View>
 
             <Text style={styles.sectionLabel}>03 / EXTRACCIÓN LOCAL</Text>
-            <Pressable disabled={!isReady || isExtracting || !note.trim()} onPress={handleExtract} style={[styles.primaryButton, (!isReady || isExtracting || !note.trim()) && styles.disabledButton]}>
-              {isExtracting ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryButtonText}>Estructurar con QVAC local</Text>}
+            <Pressable
+              disabled={
+                !isReady || isExtracting || isTranscribing || !note.trim()
+              }
+              onPress={handleExtract}
+              style={[
+                styles.primaryButton,
+                (!isReady || isExtracting || isTranscribing || !note.trim()) &&
+                  styles.disabledButton,
+              ]}
+            >
+              {isExtracting ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  Estructurar con QVAC local
+                </Text>
+              )}
             </Pressable>
 
-            {extraction && <ReviewCard extraction={extraction} onChange={updateEquipment} onSave={handleSave} isSaving={isSaving} />}
+            {extraction && (
+              <ReviewCard
+                extraction={extraction}
+                onChange={updateEquipment}
+                onSave={handleSave}
+                isSaving={isSaving}
+              />
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       ) : (
@@ -265,63 +460,257 @@ export default function App() {
           contentContainerStyle={styles.content}
           data={observations}
           keyExtractor={(item) => item.id}
-          ListHeaderComponent={<><Text style={styles.sectionLabel}>BASE INSTALADA LOCAL</Text><Text style={styles.baseTitle}>{observations.length} observaciones en este dispositivo</Text></>}
-          ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyTitle}>Tu base empieza aquí</Text><Text style={styles.emptyText}>Las observaciones confirmadas se guardan en SQLite y pueden sincronizarse después.</Text></View>}
+          ListHeaderComponent={
+            <>
+              <Text style={styles.sectionLabel}>BASE INSTALADA LOCAL</Text>
+              <Text style={styles.baseTitle}>
+                {observations.length} observaciones en este dispositivo
+              </Text>
+            </>
+          }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>Tu base empieza aquí</Text>
+              <Text style={styles.emptyText}>
+                Las observaciones confirmadas se guardan en SQLite y pueden
+                sincronizarse después.
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => <ObservationRow item={item} />}
         />
       )}
 
-      <View style={styles.tabBar}>
-        <TabButton active={tab === "capture"} label="Capturar" onPress={() => setTab("capture")} />
-        <TabButton active={tab === "base"} label="Base local" onPress={() => setTab("base")} />
+      <View
+        style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 12) }]}
+      >
+        <TabButton
+          active={tab === "capture"}
+          label="Capturar"
+          onPress={() => setTab("capture")}
+        />
+        <TabButton
+          active={tab === "base"}
+          label="Base local"
+          onPress={() => setTab("base")}
+        />
       </View>
 
-      <Modal visible={cameraOpen} animationType="slide" onRequestClose={() => setCameraOpen(false)}>
+      <Modal
+        visible={cameraOpen}
+        animationType="slide"
+        onRequestClose={() => setCameraOpen(false)}
+      >
         <View style={styles.cameraScreen}>
           <CameraView ref={cameraRef} style={styles.camera} facing="back" />
           <View style={styles.cameraControls}>
-            <Pressable onPress={() => setCameraOpen(false)}><Text style={styles.cameraCancel}>Cancelar</Text></Pressable>
-            <Pressable onPress={capturePhoto} style={styles.shutter}><View style={styles.shutterInner} /></Pressable>
+            <Pressable onPress={() => setCameraOpen(false)}>
+              <Text style={styles.cameraCancel}>Cancelar</Text>
+            </Pressable>
+            <Pressable onPress={capturePhoto} style={styles.shutter}>
+              <View style={styles.shutterInner} />
+            </Pressable>
             <Text style={styles.cameraHint}>Solo equipos / placas</Text>
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
-function ReviewCard({ extraction, onChange, onSave, isSaving }: { extraction: Extraction; onChange: (index: number, changes: Partial<EquipmentDraft>) => void; onSave: () => void; isSaving: boolean }) {
-  return <View style={styles.reviewCard}>
-    <View style={styles.reviewHeader}><View><Text style={styles.sectionLabel}>04 / REVISIÓN HUMANA</Text><Text style={styles.reviewTitle}>{extraction.equipments.length} equipos candidatos</Text></View><Text style={styles.confidence}>{Math.round(extraction.confidence * 100)}%</Text></View>
-    {extraction.equipments.map((equipment, index) => <View key={`${equipment.modality}-${index}`} style={styles.equipmentRow}>
-      <View style={styles.equipmentTop}><Text style={styles.equipmentModality}>{equipment.modality}</Text><Text style={styles.status}>{equipment.status}</Text></View>
-      <TextInput value={equipment.brand ?? ""} onChangeText={(brand) => onChange(index, { brand })} placeholder="Marca" placeholderTextColor={COLORS.muted} style={styles.smallInput} />
-      <TextInput value={equipment.model ?? ""} onChangeText={(model) => onChange(index, { model })} placeholder="Modelo / serie desconocido" placeholderTextColor={COLORS.muted} style={styles.smallInput} />
-      <View style={styles.inlineFields}><TextInput value={equipment.ageYears?.toString() ?? ""} onChangeText={(value) => onChange(index, { ageYears: value ? Number(value) : null })} placeholder="Años" keyboardType="number-pad" placeholderTextColor={COLORS.muted} style={[styles.smallInput, styles.shortInput]} /><Text style={styles.quantity}>Cantidad ×{equipment.quantity}</Text></View>
-    </View>)}
-    {extraction.nextQuestion && <View style={styles.followUp}><Text style={styles.followUpLabel}>SIGUIENTE PREGUNTA</Text><Text style={styles.followUpText}>{extraction.nextQuestion}</Text></View>}
-    <Pressable onPress={onSave} disabled={isSaving} style={styles.confirmButton}>{isSaving ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryButtonText}>Confirmar y guardar en el dispositivo</Text>}</Pressable>
-  </View>;
+function persistRecording(uri: string): string {
+  const source = new File(uri);
+  if (!source.exists)
+    throw new Error("No se pudo acceder a la grabación local");
+
+  const audioDirectory = new Directory(Paths.document, "audio");
+  audioDirectory.create({ idempotent: true, intermediates: true });
+  const destination = new File(audioDirectory, `recording-${Date.now()}.m4a`);
+  source.copy(destination);
+  return destination.uri;
+}
+
+function ReviewCard({
+  extraction,
+  onChange,
+  onSave,
+  isSaving,
+}: {
+  extraction: Extraction;
+  onChange: (index: number, changes: Partial<EquipmentDraft>) => void;
+  onSave: () => void;
+  isSaving: boolean;
+}) {
+  return (
+    <View style={styles.reviewCard}>
+      <View style={styles.reviewHeader}>
+        <View>
+          <Text style={styles.sectionLabel}>04 / REVISIÓN HUMANA</Text>
+          <Text style={styles.reviewTitle}>
+            {extraction.equipments.length} equipos candidatos
+          </Text>
+          <Text style={styles.reviewHint}>
+            Revisa cada valor antes de guardarlo como registro local.
+          </Text>
+        </View>
+        <Text style={styles.confidence}>
+          {Math.round(extraction.confidence * 100)}%
+        </Text>
+      </View>
+      <View style={styles.statusLegend}>
+        <Text style={styles.statusLegendTitle}>ESTADO DEL DATO</Text>
+        <Text style={styles.statusLegendText}>
+          Reportado: aparece en la observación. Estimado: aproximado.
+          Desconocido: sin evidencia.
+        </Text>
+      </View>
+      {extraction.equipments.map((equipment, index) => (
+        <View
+          key={`${equipment.modality}-${index}`}
+          style={styles.equipmentRow}
+        >
+          <View style={styles.equipmentTop}>
+            <Text style={styles.equipmentModality}>{equipment.modality}</Text>
+            <Text style={styles.status}>{equipment.status}</Text>
+          </View>
+          <TextInput
+            value={equipment.brand ?? ""}
+            onChangeText={(brand) => onChange(index, { brand })}
+            placeholder="Marca"
+            placeholderTextColor={COLORS.muted}
+            style={styles.smallInput}
+          />
+          <TextInput
+            value={equipment.model ?? ""}
+            onChangeText={(model) => onChange(index, { model })}
+            placeholder="Modelo / serie desconocido"
+            placeholderTextColor={COLORS.muted}
+            style={styles.smallInput}
+          />
+          <View style={styles.inlineFields}>
+            <TextInput
+              value={equipment.ageYears?.toString() ?? ""}
+              onChangeText={(value) =>
+                onChange(index, { ageYears: value ? Number(value) : null })
+              }
+              placeholder="Años"
+              keyboardType="number-pad"
+              placeholderTextColor={COLORS.muted}
+              style={[styles.smallInput, styles.shortInput]}
+            />
+            <Text style={styles.quantity}>Cantidad ×{equipment.quantity}</Text>
+          </View>
+        </View>
+      ))}
+      {(extraction.nextQuestion || extraction.missingFields.length > 0) && (
+        <View style={styles.followUp}>
+          <Text style={styles.followUpLabel}>
+            DATO PRIORITARIO POR CONFIRMAR
+          </Text>
+          {extraction.nextQuestion && (
+            <Text style={styles.followUpText}>{extraction.nextQuestion}</Text>
+          )}
+          {extraction.missingFields.length > 0 && (
+            <Text style={styles.missingFields}>
+              También falta: {formatMissingFields(extraction.missingFields)}
+            </Text>
+          )}
+        </View>
+      )}
+      <Pressable
+        onPress={onSave}
+        disabled={isSaving}
+        style={styles.confirmButton}
+      >
+        {isSaving ? (
+          <ActivityIndicator color={COLORS.white} />
+        ) : (
+          <Text style={styles.primaryButtonText}>
+            Revisar y guardar como registro local
+          </Text>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+function formatMissingFields(fields: string[]): string {
+  return fields.map((field) => FIELD_LABELS[field] ?? field).join(", ");
 }
 
 function ObservationRow({ item }: { item: LocalObservation }) {
-  return <View style={styles.observationRow}><View style={styles.rowTop}><Text style={styles.rowClient}>{item.client}</Text><Text style={styles.localPill}>{item.syncState}</Text></View><Text style={styles.rowMeta}>{item.city} · {new Date(item.createdAt).toLocaleDateString()}</Text><Text style={styles.rowNote} numberOfLines={2}>{item.rawText}</Text><Text style={styles.rowEquipment}>{item.extraction.equipments.map((equipment) => `${equipment.modality} ×${equipment.quantity}`).join("  ·  ") || "Sin equipos estructurados"}</Text></View>;
+  return (
+    <View style={styles.observationRow}>
+      <View style={styles.rowTop}>
+        <Text style={styles.rowClient}>{item.client}</Text>
+        <Text style={styles.localPill}>{item.syncState}</Text>
+      </View>
+      <Text style={styles.rowMeta}>
+        {item.city} · {new Date(item.createdAt).toLocaleDateString()}
+      </Text>
+      <Text style={styles.rowNote} numberOfLines={2}>
+        {item.rawText}
+      </Text>
+      <Text style={styles.rowEquipment}>
+        {item.extraction.equipments
+          .map((equipment) => `${equipment.modality} ×${equipment.quantity}`)
+          .join("  ·  ") || "Sin equipos estructurados"}
+      </Text>
+    </View>
+  );
 }
 
-function TabButton({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
-  return <Pressable onPress={onPress} style={styles.tab}><Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text><View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} /></Pressable>;
+function TabButton({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.tab}>
+      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+        {label}
+      </Text>
+      <View
+        style={[styles.tabIndicator, active && styles.tabIndicatorActive]}
+      />
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.paper },
   flex: { flex: 1 },
-  header: { backgroundColor: COLORS.navy, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 18, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  eyebrow: { color: "#83D8D2", fontSize: 10, fontWeight: "700", letterSpacing: 1.5 },
+  header: {
+    backgroundColor: COLORS.navy,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 18,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  eyebrow: {
+    color: "#83D8D2",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1.5,
+  },
   title: { color: COLORS.white, fontSize: 24, fontWeight: "700", marginTop: 5 },
   statusDot: { width: 12, height: 12, borderRadius: 6 },
   statusReady: { backgroundColor: "#5CD69A" },
   statusWaiting: { backgroundColor: "#F2B75A" },
-  modelBanner: { backgroundColor: COLORS.tealSoft, paddingHorizontal: 20, paddingVertical: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  modelBanner: {
+    backgroundColor: COLORS.tealSoft,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   modelCopy: { flex: 1 },
   modelTitle: { color: COLORS.teal, fontSize: 13, fontWeight: "700" },
   modelText: { color: COLORS.teal, fontSize: 11, marginTop: 2 },
@@ -330,63 +719,289 @@ const styles = StyleSheet.create({
   errorTitle: { color: "#A33C35", fontWeight: "700" },
   errorText: { color: "#A33C35", fontSize: 11, marginTop: 4 },
   content: { padding: 20, paddingBottom: 32, gap: 12 },
-  hero: { backgroundColor: COLORS.navy, borderRadius: 18, padding: 20, marginBottom: 10 },
-  heroKicker: { color: "#83D8D2", fontSize: 10, fontWeight: "700", letterSpacing: 1.2 },
-  heroTitle: { color: COLORS.white, fontSize: 25, lineHeight: 31, fontWeight: "700", marginTop: 10 },
+  hero: {
+    backgroundColor: COLORS.navy,
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 10,
+  },
+  heroKicker: {
+    color: "#83D8D2",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+  },
+  heroTitle: {
+    color: COLORS.white,
+    fontSize: 25,
+    lineHeight: 31,
+    fontWeight: "700",
+    marginTop: 10,
+  },
   heroText: { color: "#C5D3D8", fontSize: 13, lineHeight: 20, marginTop: 10 },
-  sectionLabel: { color: COLORS.teal, fontSize: 10, fontWeight: "800", letterSpacing: 1.3, marginTop: 8 },
-  card: { backgroundColor: COLORS.white, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: COLORS.line, gap: 10 },
-  input: { color: COLORS.ink, borderBottomWidth: 1, borderBottomColor: COLORS.line, paddingVertical: 11, fontSize: 15 },
-  noteInput: { minHeight: 112, textAlignVertical: "top", borderWidth: 1, borderColor: COLORS.line, borderRadius: 10, padding: 12 },
-  actionRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  actionButton: { borderWidth: 1, borderColor: COLORS.line, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, alignItems: "center", minWidth: 76 },
-  actionButtonActive: { backgroundColor: COLORS.amberSoft, borderColor: COLORS.amber },
+  sectionLabel: {
+    color: COLORS.teal,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.3,
+    marginTop: 8,
+  },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    gap: 10,
+  },
+  input: {
+    color: COLORS.ink,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
+    paddingVertical: 11,
+    fontSize: 15,
+  },
+  noteInput: {
+    minHeight: 112,
+    textAlignVertical: "top",
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    padding: 12,
+  },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  actionButton: {
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    alignItems: "center",
+    minWidth: 76,
+  },
+  actionButtonActive: {
+    backgroundColor: COLORS.amberSoft,
+    borderColor: COLORS.amber,
+  },
   actionIcon: { color: COLORS.teal, fontSize: 16, fontWeight: "700" },
-  actionLabel: { color: COLORS.ink, fontSize: 11, fontWeight: "600", marginTop: 3 },
-  transcribeButton: { backgroundColor: COLORS.tealSoft, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, flex: 1 },
-  transcribeText: { color: COLORS.teal, fontSize: 11, fontWeight: "700", textAlign: "center" },
+  actionLabel: {
+    color: COLORS.ink,
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+  recordingNote: { color: COLORS.amber, fontSize: 11, lineHeight: 16 },
+  audioNote: { color: COLORS.green, fontSize: 11, lineHeight: 16 },
   evidenceNote: { color: COLORS.amber, fontSize: 11, lineHeight: 16 },
-  primaryButton: { backgroundColor: COLORS.teal, borderRadius: 12, minHeight: 52, alignItems: "center", justifyContent: "center", paddingHorizontal: 18 },
-  primaryButtonText: { color: COLORS.white, fontSize: 14, fontWeight: "700", textAlign: "center" },
+  primaryButton: {
+    backgroundColor: COLORS.teal,
+    borderRadius: 12,
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  primaryButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: "700",
+    textAlign: "center",
+  },
   disabledButton: { opacity: 0.45 },
-  reviewCard: { backgroundColor: COLORS.white, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: COLORS.teal, marginTop: 8 },
-  reviewHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
-  reviewTitle: { color: COLORS.ink, fontSize: 19, fontWeight: "700", marginTop: 4 },
+  reviewCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.teal,
+    marginTop: 8,
+  },
+  reviewHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  reviewTitle: {
+    color: COLORS.ink,
+    fontSize: 19,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  reviewHint: {
+    color: COLORS.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
+  },
   confidence: { color: COLORS.teal, fontSize: 22, fontWeight: "800" },
-  equipmentRow: { borderTopWidth: 1, borderTopColor: COLORS.line, paddingTop: 12, marginTop: 12, gap: 8 },
+  statusLegend: {
+    backgroundColor: COLORS.paper,
+    borderRadius: 10,
+    marginTop: 14,
+    padding: 12,
+  },
+  statusLegendTitle: {
+    color: COLORS.muted,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  statusLegendText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  equipmentRow: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line,
+    paddingTop: 12,
+    marginTop: 12,
+    gap: 8,
+  },
   equipmentTop: { flexDirection: "row", justifyContent: "space-between" },
   equipmentModality: { color: COLORS.ink, fontSize: 15, fontWeight: "700" },
   status: { color: COLORS.amber, fontSize: 11, fontWeight: "700" },
-  smallInput: { borderWidth: 1, borderColor: COLORS.line, borderRadius: 8, padding: 9, color: COLORS.ink, fontSize: 13 },
+  smallInput: {
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 8,
+    padding: 9,
+    color: COLORS.ink,
+    fontSize: 13,
+  },
   inlineFields: { flexDirection: "row", alignItems: "center", gap: 10 },
   shortInput: { flex: 1 },
   quantity: { color: COLORS.muted, fontSize: 12 },
-  followUp: { backgroundColor: COLORS.amberSoft, borderRadius: 10, padding: 12, marginTop: 14 },
-  followUpLabel: { color: COLORS.amber, fontSize: 9, fontWeight: "800", letterSpacing: 1 },
-  followUpText: { color: COLORS.ink, fontSize: 13, lineHeight: 18, marginTop: 5 },
-  confirmButton: { backgroundColor: COLORS.navy, minHeight: 50, borderRadius: 11, alignItems: "center", justifyContent: "center", marginTop: 16, paddingHorizontal: 12 },
-  baseTitle: { color: COLORS.ink, fontSize: 24, fontWeight: "700", marginBottom: 8 },
-  empty: { backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.line, borderRadius: 16, padding: 22, marginTop: 14 },
+  followUp: {
+    backgroundColor: COLORS.amberSoft,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 14,
+  },
+  followUpLabel: {
+    color: COLORS.amber,
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  followUpText: {
+    color: COLORS.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 5,
+  },
+  missingFields: {
+    color: COLORS.amber,
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 16,
+    marginTop: 7,
+  },
+  confirmButton: {
+    backgroundColor: COLORS.navy,
+    minHeight: 50,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+    paddingHorizontal: 12,
+  },
+  baseTitle: {
+    color: COLORS.ink,
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  empty: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 16,
+    padding: 22,
+    marginTop: 14,
+  },
   emptyTitle: { color: COLORS.ink, fontSize: 18, fontWeight: "700" },
   emptyText: { color: COLORS.muted, lineHeight: 20, marginTop: 8 },
-  observationRow: { backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.line, borderRadius: 14, padding: 14, marginTop: 4 },
-  rowTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  observationRow: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 4,
+  },
+  rowTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   rowClient: { color: COLORS.ink, fontSize: 16, fontWeight: "700", flex: 1 },
-  localPill: { color: COLORS.green, backgroundColor: "#E2F5EA", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, fontSize: 10, fontWeight: "700" },
+  localPill: {
+    color: COLORS.green,
+    backgroundColor: "#E2F5EA",
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 10,
+    fontWeight: "700",
+  },
   rowMeta: { color: COLORS.muted, fontSize: 12, marginTop: 4 },
   rowNote: { color: COLORS.ink, fontSize: 13, lineHeight: 19, marginTop: 10 },
-  rowEquipment: { color: COLORS.teal, fontSize: 11, fontWeight: "700", marginTop: 10 },
-  tabBar: { backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.line, flexDirection: "row", paddingBottom: Platform.OS === "android" ? 10 : 4 },
+  rowEquipment: {
+    color: COLORS.teal,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 10,
+  },
+  tabBar: {
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line,
+    flexDirection: "row",
+    minHeight: 64,
+  },
   tab: { flex: 1, alignItems: "center", paddingTop: 10 },
   tabLabel: { color: COLORS.muted, fontSize: 12, fontWeight: "600" },
   tabLabelActive: { color: COLORS.teal, fontWeight: "800" },
-  tabIndicator: { width: 30, height: 3, borderRadius: 2, backgroundColor: "transparent", marginTop: 7 },
+  tabIndicator: {
+    width: 30,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "transparent",
+    marginTop: 7,
+  },
   tabIndicatorActive: { backgroundColor: COLORS.teal },
   cameraScreen: { flex: 1, backgroundColor: "#000" },
   camera: { flex: 1 },
-  cameraControls: { backgroundColor: "#000", minHeight: 118, flexDirection: "row", alignItems: "center", justifyContent: "space-around", paddingHorizontal: 20 },
+  cameraControls: {
+    backgroundColor: "#000",
+    minHeight: 118,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: 20,
+  },
   cameraCancel: { color: COLORS.white, fontSize: 14 },
   cameraHint: { color: "#AAB7BA", fontSize: 11, width: 90 },
-  shutter: { width: 68, height: 68, borderRadius: 34, borderWidth: 4, borderColor: COLORS.white, alignItems: "center", justifyContent: "center" },
-  shutterInner: { width: 54, height: 54, borderRadius: 27, backgroundColor: COLORS.white },
+  shutter: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 4,
+    borderColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shutterInner: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: COLORS.white,
+  },
 });

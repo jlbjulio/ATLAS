@@ -25,20 +25,34 @@ No inventes datos. Usa Reportado solo para información explícita, Estimado par
 `;
 
 function progress(label: string, onProgress: ProgressHandler | undefined) {
-  return (update: ModelProgressUpdate) => onProgress?.(label, Math.round(update.percentage));
+  return (update: ModelProgressUpdate) =>
+    onProgress?.(label, Math.round(update.percentage));
 }
 
-export async function initializeQVAC(onProgress?: ProgressHandler): Promise<void> {
+export async function initializeQVAC(
+  onProgress?: ProgressHandler,
+): Promise<void> {
   if (extractionModelId && transcriptionModelId) return;
 
   onProgress?.("Preparando modelo de extracción", 0);
-  await downloadAsset({ assetSrc: QWEN3_600M_INST_Q4, onProgress: progress("Extracción", onProgress) });
-  await downloadAsset({ assetSrc: WHISPER_TINY, onProgress: progress("Voz", onProgress) });
-  await downloadAsset({ assetSrc: VAD_SILERO_5_1_2, onProgress: progress("VAD", onProgress) });
+  await downloadAsset({
+    assetSrc: QWEN3_600M_INST_Q4,
+    onProgress: progress("Extracción", onProgress),
+  });
+  await downloadAsset({
+    assetSrc: WHISPER_TINY,
+    onProgress: progress("Voz", onProgress),
+  });
+  await downloadAsset({
+    assetSrc: VAD_SILERO_5_1_2,
+    onProgress: progress("VAD", onProgress),
+  });
 
   extractionModelId = await loadModel({
     modelSrc: QWEN3_600M_INST_Q4,
-    modelConfig: { ctx_size: 2048, device: "gpu" },
+    // CPU is the portable local backend on Android. It avoids device-specific GPU
+    // driver failures while keeping all inference on the field device.
+    modelConfig: { ctx_size: 1024, device: "cpu" },
   });
   transcriptionModelId = await loadModel({
     modelSrc: WHISPER_TINY,
@@ -48,10 +62,14 @@ export async function initializeQVAC(onProgress?: ProgressHandler): Promise<void
 }
 
 export async function extractObservation(note: string): Promise<Extraction> {
-  if (!extractionModelId) throw new Error("El modelo de extracción local no está listo");
+  if (!extractionModelId)
+    throw new Error("El modelo de extracción local no está listo");
   const result = completion({
     modelId: extractionModelId,
-    history: [{ role: "system", content: EXTRACTION_PROMPT }, { role: "user", content: note }],
+    history: [
+      { role: "system", content: EXTRACTION_PROMPT },
+      { role: "user", content: note },
+    ],
     stream: false,
   });
   const final = await result.final;
@@ -62,13 +80,18 @@ export async function extractObservation(note: string): Promise<Extraction> {
 }
 
 export async function transcribeObservation(uri: string): Promise<string> {
-  if (!transcriptionModelId) throw new Error("El modelo de voz local no está listo");
-  return transcribe({ modelId: transcriptionModelId, audioChunk: uri });
+  if (!transcriptionModelId)
+    throw new Error("El modelo de voz local no está listo");
+  // QVAC's native Whisper worker requires a filesystem path, not Expo's file URI.
+  const audioPath = decodeURIComponent(uri.replace(/^file:\/\//, ""));
+  return transcribe({ modelId: transcriptionModelId, audioChunk: audioPath });
 }
 
 export async function shutdownQVAC(): Promise<void> {
-  if (extractionModelId) await unloadModel({ modelId: extractionModelId, clearStorage: false });
-  if (transcriptionModelId) await unloadModel({ modelId: transcriptionModelId, clearStorage: false });
+  if (extractionModelId)
+    await unloadModel({ modelId: extractionModelId, clearStorage: false });
+  if (transcriptionModelId)
+    await unloadModel({ modelId: transcriptionModelId, clearStorage: false });
   extractionModelId = null;
   transcriptionModelId = null;
 }
