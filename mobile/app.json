@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "ATLAS Field",
+    "slug": "atlas-field",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.atlas.field",
+      "permissions": [
+        "RECORD_AUDIO",
+        "CAMERA"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "ATLAS usa el micrófono para dictar observaciones de campo."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "ATLAS usa la cámara para capturar placas autorizadas."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 29
+          }
+        }
+      ],
+      "expo-sqlite",
+      "@qvac/sdk/expo-plugin",
+      "expo-asset"
+    ]
+  }
+}
