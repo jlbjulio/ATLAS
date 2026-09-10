@@ -8,6 +8,7 @@ import {
   Clock,
   ChevronDown,
   Filter,
+  MessageCircle,
 } from 'lucide-react';
 import {
   Card,
@@ -49,6 +50,7 @@ const intentLabels: Record<QueryIntent, string> = {
 export function QueriesPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
+  const [queryError, setQueryError] = useState<string | null>(null);
   const [currentQuery, setCurrentQuery] = useState<{
     query: string;
     parsedIntent: QueryIntent;
@@ -90,6 +92,7 @@ export function QueriesPage() {
   const handleSearch = async (query: string) => {
     setIsLoading(true);
     setCurrentQuery(null);
+    setQueryError(null);
 
     try {
       const response = await api.search(query);
@@ -102,6 +105,7 @@ export function QueriesPage() {
       });
     } catch (err) {
       console.error('Search error:', err);
+      setQueryError('ATLAS no pudo responder esta pregunta. Revisa que el backend local y QVAC estén disponibles.');
     } finally {
       setIsLoading(false);
     }
@@ -138,7 +142,7 @@ export function QueriesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-surface-900">Consultas en Lenguaje Natural</h1>
-          <p className="mt-1 text-surface-500">Pregunta sobre la base instalada como lo harías con un colega</p>
+          <p className="mt-1 text-surface-500">Conversa con ATLAS sobre la base instalada, como lo harías con un colega.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setShowExamples(!showExamples)}>
@@ -149,9 +153,25 @@ export function QueriesPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <SearchForm onSearch={handleSearch} isLoading={isLoading} suggestions={exampleQueries} onSuggestionClick={handleSearch} />
+           <SearchForm onSearch={handleSearch} isLoading={isLoading} suggestions={exampleQueries} onSuggestionClick={handleSearch} />
 
-          {showExamples && (
+           {queryError && (
+             <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+               <span>{queryError}</span>
+             </div>
+           )}
+
+           {isLoading && (
+             <div className="flex items-center gap-3 text-sm text-surface-500" role="status">
+               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-50 text-primary-600">
+                 <MessageCircle className="h-5 w-5 animate-pulse" />
+               </div>
+               <span>ATLAS está preparando una respuesta con inferencia local...</span>
+             </div>
+           )}
+
+           {showExamples && (
             <Card>
               <CardHeader>
                 <CardTitle>Ejemplos de Consultas</CardTitle>
@@ -169,13 +189,23 @@ export function QueriesPage() {
             </Card>
           )}
 
-          {currentQuery && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Resultados para: <span className="font-normal text-primary-600">&#34;{currentQuery.query}&#34;</span></CardTitle>
-                    <CardDescription>Interpretado como: <strong>{intentLabels[currentQuery.parsedIntent]}</strong> · {uniqueClients} clientes · {totalResults} equipos</CardDescription>
+           {currentQuery && (
+             <div className="space-y-3">
+               <div className="flex justify-end">
+                 <div className="max-w-[90%] rounded-2xl rounded-br-md bg-[#071a26] px-4 py-3 text-sm text-white shadow-sm">
+                   {currentQuery.query}
+                 </div>
+               </div>
+               <div className="flex items-start gap-3">
+                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-600">
+                   <MessageCircle className="h-5 w-5" />
+                 </div>
+                 <Card className="min-w-0 flex-1">
+               <CardHeader>
+                 <div className="flex items-center justify-between">
+                   <div>
+                     <CardTitle>Esto encontré</CardTitle>
+                     <CardDescription>Interpreté tu pregunta como <strong>{intentLabels[currentQuery.parsedIntent]}</strong> · {uniqueClients} clientes · {totalResults} equipos</CardDescription>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={handleExport}><Download className="w-4 h-4 mr-1" /> Exportar CSV</Button>
@@ -222,9 +252,11 @@ export function QueriesPage() {
                     ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          )}
+               </CardContent>
+                 </Card>
+               </div>
+             </div>
+           )}
 
           {currentQuery && (
             <Card>

@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { AlertTriangle, Mic, Loader2, Sparkles, X } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { AlertTriangle, Mic, Loader2, Sparkles, X, Square } from "lucide-react";
 import {
   Button,
   Textarea,
@@ -95,15 +95,23 @@ export function ObservationForm({
   const [errors, setErrors] = useState<Partial<CaptureFormData>>({});
   const [isExtracting, setIsExtracting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null,
-  );
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [editableExtraction, setEditableExtraction] =
     useState<QVACExtractionResult | null>(extractionResult ?? null);
 
   useEffect(() => {
     setEditableExtraction(extractionResult ?? null);
   }, [extractionResult]);
+
+  useEffect(() => {
+    return () => {
+      mediaRecorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<CaptureFormData> = {};
@@ -166,22 +174,31 @@ export function ObservationForm({
 
   const handleRecordAudio = async () => {
     if (isRecording) {
-      mediaRecorder?.stop();
+      mediaRecorderRef.current?.stop();
       return;
     }
 
+    setVoiceError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       const chunks: BlobPart[] = [];
 
+      streamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+
       recorder.ondataavailable = (e) => chunks.push(e.data);
       recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: "audio/webm" });
-        const audioFile = new File([blob], `recording-${Date.now()}.webm`, { type: "audio/webm" });
+        setIsRecording(false);
+        mediaRecorderRef.current = null;
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
 
-        if (onTranscribe) {
-          try {
+        try {
+          if (onTranscribe && chunks.length > 0) {
+            setIsTranscribing(true);
+            const blob = new Blob(chunks, { type: "audio/webm" });
+            const audioFile = new File([blob], `recording-${Date.now()}.webm`, { type: "audio/webm" });
             const transcribed = await onTranscribe(audioFile);
             setFormData((prev) => ({
               ...prev,
@@ -189,21 +206,43 @@ export function ObservationForm({
                 ? `${prev.rawText} ${transcribed}`
                 : transcribed,
             }));
-          } catch (err) {
-            console.error("Transcription failed:", err);
           }
+        } catch (err) {
+          console.error("Transcription failed:", err);
+          setVoiceError("No se pudo transcribir el audio. Intenta de nuevo.");
+        } finally {
+          setIsTranscribing(false);
+          mediaRecorderRef.current = null;
+          streamRef.current = null;
+          setIsRecording(false);
         }
+      };
 
+      recorder.onerror = () => {
+        setVoiceError("La grabación se interrumpió. Revisa el permiso del micrófono.");
+        setIsRecording(false);
         stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        streamRef.current = null;
       };
 
       recorder.start();
-      setMediaRecorder(recorder);
       setIsRecording(true);
     } catch (error) {
       console.error("Microphone access failed:", error);
+      setVoiceError("No se pudo activar el micrófono. Revisa los permisos del navegador.");
+      setIsRecording(false);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      mediaRecorderRef.current = null;
     }
   };
+
+  const voiceStatus = isRecording
+    ? "Grabando... pulsa para detener"
+    : isTranscribing
+      ? "Transcribiendo localmente..."
+      : voiceError ?? "Dicta una observación y ATLAS la convertirá en texto";
 
   const handleFileUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -281,16 +320,14 @@ export function ObservationForm({
                   variant={isRecording ? "danger" : "ghost"}
                   size="sm"
                   onClick={handleRecordAudio}
-                  disabled={isExtracting}
+                   disabled={isExtracting || isTranscribing}
                   aria-label={
                     isRecording
                       ? "Detener grabación"
                       : "Iniciar grabación por voz"
                   }
                 >
-                  <Mic
-                    className={`w-4 h-4 ${isRecording ? "animate-pulse text-red-500" : ""}`}
-                  />
+                   {isRecording ? <Square className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
                 <Button
                   type="button"
@@ -311,6 +348,9 @@ export function ObservationForm({
                 </Button>
               </div>
             </div>
+            <p className={`mt-2 text-xs ${voiceError ? "text-red-600" : "text-surface-500"}`} role={voiceError ? "alert" : "status"}>
+              {voiceStatus}
+            </p>
             {errors.rawText && (
               <p className="mt-1 text-sm text-red-600" role="alert">
                 {errors.rawText}

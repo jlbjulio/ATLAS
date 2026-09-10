@@ -89,10 +89,10 @@ web/
 | Ruta | Pagina | Descripcion |
 |------|--------|-------------|
 | `/` | Dashboard | Resumen de base instalada, metricas, alertas |
-| `/capture` | Captura | Flujo Observar -> Revisar -> Confirmar con QVAC |
+| `/capture` | Captura | Flujo Observar -> Revisar -> Confirmar con QVAC y dictado por voz |
 | `/installed-base` | Base Instalada | Tabla/tarjetas de equipos por cliente |
 | `/installed-base/:client` | Detalle Cliente | Deep link a un cliente especifico |
-| `/queries` | Consultas NL | Busqueda en lenguaje natural tipo chat |
+| `/queries` | Consultas NL | Conversacion con ATLAS sobre la base instalada |
 | `/settings` | Configuracion | Tema, almacenamiento, P2P (roadmap) |
 | `/help` | Ayuda | FAQ, recursos, contactos |
 
@@ -109,6 +109,13 @@ npm run typecheck    # Verificacion de tipos
 npm run lint         # ESLint
 npm run check        # typecheck + lint + format
 ```
+
+## Experiencia de uso
+
+- El boton del microfono alterna entre `Iniciar grabacion` y `Detener grabacion`.
+- Al detener, el stream del microfono se libera inmediatamente y la UI muestra el estado de transcripcion.
+- Las preguntas de `/queries` se escriben en un composer multilinea y aparecen como turnos de usuario y ATLAS, no como una busqueda de texto simple.
+- La inferencia y transcripcion usan el backend local y QVAC; no requieren servicios de inferencia externos.
 
 ---
 

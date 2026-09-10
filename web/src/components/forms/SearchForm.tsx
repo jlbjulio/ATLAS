@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Search, X, Loader2 } from "lucide-react";
+import { MessageCircle, X, Sparkles } from "lucide-react";
 import {
   Button,
   Card,
@@ -53,14 +53,20 @@ export function SearchForm({
   return (
     <Card className="relative">
       <CardHeader>
-        <CardTitle>Consulta Inteligente de Base Instalada</CardTitle>
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+            <MessageCircle className="h-5 w-5" />
+          </div>
+          <div>
+            <CardTitle>Conversa con ATLAS</CardTitle>
+            <p className="mt-1 text-sm font-normal text-surface-500">Pregunta por clientes, equipos, antigüedad o renovaciones.</p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="relative">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-            <input
-              type="text"
+          <div className="rounded-xl border border-surface-200 bg-surface-50 p-3 transition-colors focus-within:border-primary-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-100">
+            <textarea
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -68,9 +74,10 @@ export function SearchForm({
               }}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              placeholder={placeholder}
-              className="input pl-10 pr-12 py-3 text-base"
+              placeholder={placeholder === "Consulta en lenguaje natural..." ? "Ej. ¿Qué tomógrafos Philips necesitan renovación?" : placeholder}
+              className="min-h-[88px] w-full resize-none border-0 bg-transparent p-0 text-base text-surface-900 outline-none placeholder:text-surface-400 focus:ring-0"
               disabled={isLoading}
+              aria-label="Pregunta para ATLAS"
             />
             {query && (
               <Button
@@ -79,8 +86,8 @@ export function SearchForm({
                 size="sm"
                 className="absolute right-1 top-1/2 -translate-y-1/2"
                 onClick={() => setQuery("")}
-                aria-label="Limpiar búsqueda"
-              >
+                  aria-label="Limpiar pregunta"
+                >
                 <X className="w-4 h-4" />
               </Button>
             )}
@@ -99,7 +106,7 @@ export function SearchForm({
                         onClick={() => handleSuggestionClick(suggestion)}
                         className="w-full px-4 py-2 text-left text-sm text-surface-700 hover:bg-surface-50 transition-colors flex items-center gap-2"
                       >
-                        <Search className="w-4 h-4 text-surface-400" />
+                        <MessageCircle className="w-4 h-4 text-surface-400" />
                         {suggestion}
                       </button>
                     </li>
@@ -115,11 +122,11 @@ export function SearchForm({
               disabled={!query.trim() || isLoading}
               className="w-full sm:w-auto"
             >
-              <Loader2 className="w-4 h-4" />
-              Buscar
+              {!isLoading && <Sparkles className="w-4 h-4" />}
+              Preguntar a ATLAS
             </Button>
             {isLoading && (
-              <span className="text-sm text-surface-500">Procesando...</span>
+              <span className="text-sm text-surface-500">ATLAS está pensando localmente...</span>
             )}
           </div>
         </form>

@@ -74,7 +74,7 @@ chore(deps): upgrade react-router-dom to v6.26
 ## 🏗️ Estructura de Componentes
 
 ```
-src/
+web/src/
 ├── components/
 │   ├── common/           # UI primitiva reutilizable
 │   │   ├── Button.tsx
@@ -107,8 +107,7 @@ src/
 ├── stores/               # Estado global (Zustand)
 │   ├── useAppStore.ts
 │   └── index.ts
-├── services/             # APIs externas / SDKs
-│   ├── qvac.ts
+├── services/             # Cliente del backend local
 │   └── api.ts
 ├── types/                # Contratos TypeScript / Zod
 │   └── index.ts
@@ -147,6 +146,8 @@ src/
 - **Componentes base** en `components/common/` — extender antes de crear nuevos.
 - **Responsive:** mobile-first, breakpoints `sm` (640px), `md` (768px), `lg` (1024px), `xl` (1280px).
 - **Accesibilidad:** labels en inputs, `aria-*` en modales/dropdowns, focus visible, contraste AA.
+- **Captura por voz:** el botón debe reflejar `idle`, `recording` y `transcribing`; siempre hay que detener los tracks del `MediaStream` al finalizar o desmontar.
+- **Consultas NL:** usar un composer multilinea y presentar la pregunta y la respuesta como turnos de conversación; evitar tratarlo como un buscador genérico.
 
 ---
 
@@ -198,7 +199,7 @@ Antes de abrir PR a `develop`:
 
 - **Producción:** React 18, React Router 6, Zustand, Zod, @qvac/sdk, lucide-react, date-fns
 - **Dev:** Vite 5, TypeScript 5, Tailwind 3, ESLint 8, Prettier 3, Vitest
-- **Política:** `npm install` solo en `package.json` del frontend (`src/atlas/ui/`). No tocar root `package.json` salvo tooling compartido.
+- **Política:** `npm install` solo en `web/package.json`. No tocar root `package.json` salvo tooling compartido.
 
 ---
 
