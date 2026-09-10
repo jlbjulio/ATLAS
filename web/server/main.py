@@ -101,6 +101,20 @@ def require_models(*names: str) -> None:
         )
 
 
+# Extensiones que el runtime QVAC decodifica localmente con su FFmpeg embebido.
+# Fuera de esta lista el runtime recibe los bytes crudos como PCM (fallo para
+# .webm/.opus/.mov grabados con MediaRecorder), así que se normalizan a .ogg,
+# que el FFmpeg embebido detecta por contenido aunque el contenedor real sea WebM.
+QVAC_DECODABLE_SUFFIXES = {".mp3", ".m4a", ".ogg", ".flac", ".aac", ".wav"}
+
+
+def audio_suffix_for_runtime(filename: str | None) -> str:
+    suffix = Path(filename or "").suffix.lower()
+    if suffix in QVAC_DECODABLE_SUFFIXES or suffix == ".raw":
+        return suffix
+    return ".ogg"
+
+
 def get_database() -> SQLiteDatabase:
     return SQLiteDatabase()
 
@@ -238,7 +252,7 @@ async def transcribe_audio(
     runtime: Annotated[QvacRuntime, Depends(get_qvac_runtime)],
 ) -> TranscribeResponse:
     require_models("whisper-small", "silero-vad")
-    suffix = Path(file.filename or "audio.webm").suffix
+    suffix = audio_suffix_for_runtime(file.filename)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
