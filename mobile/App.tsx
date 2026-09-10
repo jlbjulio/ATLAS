@@ -35,6 +35,13 @@ import {
   shutdownQVAC,
   transcribeObservation,
 } from "./src/qvac";
+import {
+  delegateExtraction,
+  delegateTranscription,
+  pairWithProvider,
+  pairWithInvitation,
+  type P2PProvider,
+} from "./src/p2p";
 import type { EquipmentDraft, Extraction, LocalObservation } from "./src/types";
 
 type Tab = "capture" | "base";
@@ -90,12 +97,23 @@ function FieldApp() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [provider, setProvider] = useState<P2PProvider | null>(null);
+  const [providerUrl, setProviderUrl] = useState("");
+  const [pairingCode, setPairingCode] = useState("");
+  const [pairingOpen, setPairingOpen] = useState(false);
+  const [isPairing, setIsPairing] = useState(false);
+  const [lastInference, setLastInference] = useState<"local" | "p2p" | null>(
+    null,
+  );
+  const [qrScanning, setQrScanning] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const [micPermission, setMicPermission] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
+  const inferenceAvailable = isReady || Boolean(provider);
 
   useEffect(() => {
     let mounted = true;
@@ -134,7 +152,7 @@ function FieldApp() {
   }, []);
 
   async function toggleRecording() {
-    if (!isReady || isTranscribing) return;
+    if (!inferenceAvailable || isTranscribing) return;
     if (!micPermission) {
       const permission = await AudioModule.requestRecordingPermissionsAsync();
       setMicPermission(permission.granted);
@@ -178,45 +196,126 @@ function FieldApp() {
   }
 
   async function handleTranscribe(uri: string) {
-    if (!isReady) return;
+    if (!inferenceAvailable) return;
     setIsTranscribing(true);
     try {
-      setModelState("Transcribiendo en el dispositivo");
-      const text = (await transcribeObservation(uri)).trim();
+      let text: string;
+      if (provider) {
+        try {
+          setModelState("Delegando audio a la laptop");
+          text = await delegateTranscription(provider, uri);
+          setLastInference("p2p");
+          setModelState("Audio procesado por laptop P2P");
+        } catch (error) {
+          if (!isReady) throw error;
+          setModelState("Proveedor no disponible; procesando localmente");
+          text = await transcribeObservation(uri);
+          setLastInference("local");
+        }
+      } else {
+        setModelState("Transcribiendo en el dispositivo");
+        text = await transcribeObservation(uri);
+        setLastInference("local");
+      }
+      text = text.trim();
       if (!text) throw new Error("No se detectó voz en la grabación");
       setNote((current) => (current ? `${current}\n${text}` : text));
-      setModelState("Inferencia local lista");
+      setModelState(provider ? "Proveedor P2P listo" : "Inferencia local lista");
     } catch (error) {
       Alert.alert(
         "No se pudo transcribir",
         error instanceof Error ? error.message : "Error local de voz",
       );
-      setModelState("Inferencia local lista");
+      setModelState(provider ? "Proveedor P2P listo" : "Inferencia local lista");
     } finally {
       setIsTranscribing(false);
     }
   }
 
   async function handleExtract() {
-    if (!note.trim() || !isReady) return;
+    if (!note.trim() || !inferenceAvailable) return;
     setIsExtracting(true);
     try {
-      setModelState("Estructurando en el dispositivo");
-      setExtraction(
-        await extractObservation(
-          `Cliente: ${client}\nCiudad: ${city}\nObservación: ${note}`,
-        ),
-      );
-      setModelState("Inferencia local lista");
+      const context = `Cliente: ${client}\nCiudad: ${city}\nObservación: ${note}`;
+      if (provider) {
+        try {
+          setModelState("Delegando extracción a la laptop");
+          setExtraction(await delegateExtraction(provider, context));
+          setLastInference("p2p");
+        } catch (error) {
+          if (!isReady) throw error;
+          setModelState("Proveedor no disponible; procesando localmente");
+          setExtraction(await extractObservation(context));
+          setLastInference("local");
+        }
+      } else {
+        setModelState("Estructurando en el dispositivo");
+        setExtraction(await extractObservation(context));
+        setLastInference("local");
+      }
+      setModelState(provider ? "Proveedor P2P listo" : "Inferencia local lista");
     } catch (error) {
       Alert.alert(
         "No se pudo estructurar",
         error instanceof Error ? error.message : "Error local de extracción",
       );
-      setModelState("Inferencia local lista");
+      setModelState(provider ? "Proveedor P2P listo" : "Inferencia local lista");
     } finally {
       setIsExtracting(false);
     }
+  }
+
+  async function handlePair() {
+    setIsPairing(true);
+    try {
+      const paired = await pairWithProvider(providerUrl, pairingCode);
+      setProvider(paired);
+      setPairingCode("");
+      setPairingOpen(false);
+      setModelState("Proveedor P2P listo");
+    } catch (error) {
+      Alert.alert(
+        "No se pudo emparejar",
+        error instanceof Error ? error.message : "Error de proveedor P2P",
+      );
+    } finally {
+      setIsPairing(false);
+    }
+  }
+
+  async function startQrScanning() {
+    if (!cameraPermission?.granted) {
+      const permission = await requestCameraPermission();
+      if (!permission.granted) {
+        Alert.alert(
+          "Permiso de cámara",
+          "Se necesita acceso a la cámara para escanear el código QR de la laptop.",
+        );
+        return;
+      }
+    }
+    setQrScanning(true);
+  }
+
+  function handleBarcodeScanned({ data }: { data: string }) {
+    if (!qrScanning) return;
+    setQrScanning(false);
+    setIsPairing(true);
+    pairWithInvitation(data)
+      .then((paired) => {
+        setProvider(paired);
+        setPairingCode("");
+        setPairingOpen(false);
+        setManualMode(false);
+        setModelState("Proveedor P2P listo");
+      })
+      .catch((error) => {
+        Alert.alert(
+          "No se pudo emparejar",
+          error instanceof Error ? error.message : "Error de proveedor P2P",
+        );
+      })
+      .finally(() => setIsPairing(false));
   }
 
   function updateEquipment(index: number, changes: Partial<EquipmentDraft>) {
@@ -289,7 +388,7 @@ function FieldApp() {
         <View
           style={[
             styles.statusDot,
-            isReady ? styles.statusReady : styles.statusWaiting,
+            inferenceAvailable ? styles.statusReady : styles.statusWaiting,
           ]}
         />
       </View>
@@ -303,10 +402,16 @@ function FieldApp() {
         <View style={styles.modelBanner}>
           <View style={styles.modelCopy}>
             <Text style={styles.modelTitle}>
-              {isReady ? "Procesamiento local activo" : modelState}
+              {provider
+                ? "Proveedor P2P conectado"
+                : isReady
+                  ? "Procesamiento local activo"
+                  : modelState}
             </Text>
             <Text style={styles.modelText}>
-              La evidencia no sale del dispositivo.
+              {provider
+                ? "Texto y audio viajan directo a la laptop emparejada."
+                : "La evidencia no sale del dispositivo."}
             </Text>
           </View>
           {modelProgress !== null && (
@@ -334,6 +439,35 @@ function FieldApp() {
                 Dicta, escribe o fotografía solo equipos y placas autorizadas.
                 Revisa cada sugerencia antes de confirmarla.
               </Text>
+            </View>
+
+            <Text style={styles.sectionLabel}>CAPACIDAD COMPARTIDA</Text>
+            <View style={styles.providerCard}>
+              <View style={styles.providerCopy}>
+                <Text style={styles.providerTitle}>
+                  {provider ? "Laptop P2P lista" : "Inferencia local disponible"}
+                </Text>
+                <Text style={styles.providerText}>
+                  {provider
+                    ? "Audio y extracción se delegan primero. Si no responde, ATLAS usa QVAC local."
+                    : "Empareja una laptop en la misma Wi-Fi para delegar audio y texto cuando convenga."}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  if (provider) {
+                    setProvider(null);
+                    setModelState(isReady ? "Inferencia local lista" : "Proveedor desconectado");
+                  } else {
+                    setPairingOpen(true);
+                  }
+                }}
+                style={styles.providerButton}
+              >
+                <Text style={styles.providerButtonText}>
+                  {provider ? "Desconectar" : "Conectar"}
+                </Text>
+              </Pressable>
             </View>
 
             <Text style={styles.sectionLabel}>01 / CONTEXTO DE VISITA</Text>
@@ -371,12 +505,12 @@ function FieldApp() {
                       ? "Detener dictado"
                       : "Iniciar dictado"
                   }
-                  disabled={!isReady || isTranscribing}
+                  disabled={!inferenceAvailable || isTranscribing}
                   onPress={toggleRecording}
                   style={[
                     styles.actionButton,
                     recorderState.isRecording && styles.actionButtonActive,
-                    (!isReady || isTranscribing) && styles.disabledButton,
+                    (!inferenceAvailable || isTranscribing) && styles.disabledButton,
                   ]}
                 >
                   <Text style={styles.actionIcon}>
@@ -405,7 +539,7 @@ function FieldApp() {
               )}
               {audioUri && !recorderState.isRecording && !isTranscribing && (
                 <Text style={styles.audioNote}>
-                  Dictado transcrito localmente y añadido a la observación.
+                  Dictado transcrito {lastInference === "p2p" ? "por laptop P2P" : "localmente"} y añadido a la observación.
                 </Text>
               )}
               {photoUri && (
@@ -416,15 +550,17 @@ function FieldApp() {
               )}
             </View>
 
-            <Text style={styles.sectionLabel}>03 / EXTRACCIÓN LOCAL</Text>
+            <Text style={styles.sectionLabel}>
+              03 / {provider ? "EXTRACCIÓN P2P" : "EXTRACCIÓN LOCAL"}
+            </Text>
             <Pressable
               disabled={
-                !isReady || isExtracting || isTranscribing || !note.trim()
+                !inferenceAvailable || isExtracting || isTranscribing || !note.trim()
               }
               onPress={handleExtract}
               style={[
                 styles.primaryButton,
-                (!isReady || isExtracting || isTranscribing || !note.trim()) &&
+                (!inferenceAvailable || isExtracting || isTranscribing || !note.trim()) &&
                   styles.disabledButton,
               ]}
             >
@@ -432,7 +568,7 @@ function FieldApp() {
                 <ActivityIndicator color={COLORS.white} />
               ) : (
                 <Text style={styles.primaryButtonText}>
-                  Estructurar con QVAC local
+                    {provider ? "Estructurar con laptop P2P" : "Estructurar con QVAC local"}
                 </Text>
               )}
             </Pressable>
@@ -504,6 +640,137 @@ function FieldApp() {
               <View style={styles.shutterInner} />
             </Pressable>
             <Text style={styles.cameraHint}>Solo equipos / placas</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={pairingOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setPairingOpen(false);
+          setQrScanning(false);
+          setManualMode(false);
+        }}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.pairingSheet}>
+            {qrScanning ? (
+              <>
+                <Text style={styles.pairingTitle}>Enlazar con laptop</Text>
+                <Text style={styles.pairingText}>
+                  Apunta la cámara al código QR de la laptop.
+                </Text>
+                <View style={styles.qrScannerContainer}>
+                  <CameraView
+                    style={styles.qrScanner}
+                    facing="back"
+                    barcodeScannerSettings={{
+                      barcodeTypes: ["qr"],
+                    }}
+                    onBarcodeScanned={handleBarcodeScanned}
+                  />
+                </View>
+                <Pressable
+                  onPress={() => setQrScanning(false)}
+                  style={styles.modalCancel}
+                >
+                  <Text style={styles.modalCancelText}>Cancelar escaneo</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.pairingTitle}>Enlazar con laptop</Text>
+                <Text style={styles.pairingText}>
+                  Conecta ambos dispositivos a la misma Wi-Fi y escanea el código que muestra la laptop.
+                </Text>
+                <Pressable
+                  disabled={isPairing}
+                  onPress={startQrScanning}
+                  style={[
+                    styles.modalConnect,
+                    styles.qrButton,
+                    isPairing && styles.disabledButton,
+                  ]}
+                >
+                  {isPairing ? (
+                    <ActivityIndicator color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.modalConnectText}>
+                      Escanear código QR
+                    </Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={() => setManualMode((current) => !current)}
+                  style={styles.modalToggle}
+                >
+                  <Text style={styles.modalToggleText}>
+                    {manualMode ? "Ocultar entrada manual" : "Ingresar manualmente"}
+                  </Text>
+                </Pressable>
+                {manualMode && (
+                  <>
+                    <TextInput
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                      placeholder="http://192.168.1.20:8000"
+                      placeholderTextColor={COLORS.muted}
+                      value={providerUrl}
+                      onChangeText={setProviderUrl}
+                      style={styles.modalInput}
+                    />
+                    <TextInput
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      placeholder="Código de emparejamiento"
+                      placeholderTextColor={COLORS.muted}
+                      secureTextEntry
+                      value={pairingCode}
+                      onChangeText={setPairingCode}
+                      style={styles.modalInput}
+                    />
+                    <View style={styles.modalActions}>
+                      <Pressable
+                        onPress={() => setPairingOpen(false)}
+                        style={styles.modalCancel}
+                      >
+                        <Text style={styles.modalCancelText}>Cancelar</Text>
+                      </Pressable>
+                      <Pressable
+                        disabled={
+                          isPairing || !providerUrl.trim() || !pairingCode.trim()
+                        }
+                        onPress={handlePair}
+                        style={[
+                          styles.modalConnect,
+                          (isPairing ||
+                            !providerUrl.trim() ||
+                            !pairingCode.trim()) &&
+                            styles.disabledButton,
+                        ]}
+                      >
+                        {isPairing ? (
+                          <ActivityIndicator color={COLORS.white} />
+                        ) : (
+                          <Text style={styles.modalConnectText}>Emparejar</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+                {!manualMode && (
+                  <Pressable
+                    onPress={() => setPairingOpen(false)}
+                    style={styles.modalCancel}
+                  >
+                    <Text style={styles.modalCancelText}>Cancelar</Text>
+                  </Pressable>
+                )}
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -750,6 +1017,26 @@ const styles = StyleSheet.create({
     borderColor: COLORS.line,
     gap: 10,
   },
+  providerCard: {
+    backgroundColor: "#EAF2F5",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#B7D1D9",
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  providerCopy: { flex: 1 },
+  providerTitle: { color: COLORS.navy, fontSize: 14, fontWeight: "700" },
+  providerText: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginTop: 4 },
+  providerButton: {
+    backgroundColor: COLORS.navy,
+    borderRadius: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  providerButtonText: { color: COLORS.white, fontSize: 11, fontWeight: "700" },
   input: {
     color: COLORS.ink,
     borderBottomWidth: 1,
@@ -1021,4 +1308,56 @@ const styles = StyleSheet.create({
     borderRadius: 27,
     backgroundColor: COLORS.white,
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(12, 40, 53, 0.56)",
+    justifyContent: "flex-end",
+  },
+  pairingSheet: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 22,
+    gap: 12,
+  },
+  pairingTitle: { color: COLORS.ink, fontSize: 21, fontWeight: "700" },
+  pairingText: { color: COLORS.muted, fontSize: 13, lineHeight: 19 },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    padding: 12,
+    color: COLORS.ink,
+    fontSize: 14,
+  },
+  modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 4 },
+  modalCancel: { justifyContent: "center", paddingHorizontal: 14 },
+  modalCancelText: { color: COLORS.muted, fontSize: 14, fontWeight: "700" },
+  modalConnect: {
+    backgroundColor: COLORS.teal,
+    minWidth: 116,
+    minHeight: 44,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalConnectText: { color: COLORS.white, fontSize: 14, fontWeight: "700" },
+  qrButton: { minWidth: 200, minHeight: 52 },
+  modalToggle: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  modalToggleText: {
+    color: COLORS.teal,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  qrScannerContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    height: 280,
+  },
+  qrScanner: { flex: 1 },
 });
