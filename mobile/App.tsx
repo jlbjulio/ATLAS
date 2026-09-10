@@ -544,7 +544,7 @@ function ReviewCard({
   return (
     <View style={styles.reviewCard}>
       <View style={styles.reviewHeader}>
-        <View>
+        <View style={styles.reviewHeaderCopy}>
           <Text style={styles.sectionLabel}>04 / REVISIÓN HUMANA</Text>
           <Text style={styles.reviewTitle}>
             {extraction.equipments.length} equipos candidatos
@@ -553,15 +553,18 @@ function ReviewCard({
             Revisa cada valor antes de guardarlo como registro local.
           </Text>
         </View>
-        <Text style={styles.confidence}>
-          {Math.round(extraction.confidence * 100)}%
-        </Text>
+        <View style={styles.confidenceBadge}>
+          <Text style={styles.confidenceLabel}>CONFIANZA</Text>
+          <Text style={styles.confidence}>
+            {Math.round(extraction.confidence * 100)}%
+          </Text>
+        </View>
       </View>
       <View style={styles.statusLegend}>
-        <Text style={styles.statusLegendTitle}>ESTADO DEL DATO</Text>
+        <Text style={styles.statusLegendTitle}>CÓMO LEER LOS ESTADOS</Text>
         <Text style={styles.statusLegendText}>
-          Reportado: aparece en la observación. Estimado: aproximado.
-          Desconocido: sin evidencia.
+          Reportado = explícito · Estimado = aproximado · Desconocido = sin
+          evidencia
         </Text>
       </View>
       {extraction.equipments.map((equipment, index) => (
@@ -826,6 +829,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
+  reviewHeaderCopy: { flex: 1, minWidth: 0, paddingRight: 8 },
   reviewTitle: {
     color: COLORS.ink,
     fontSize: 19,
@@ -838,12 +842,32 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 4,
   },
-  confidence: { color: COLORS.teal, fontSize: 22, fontWeight: "800" },
+  confidenceBadge: {
+    alignItems: "flex-end",
+    backgroundColor: COLORS.tealSoft,
+    borderRadius: 9,
+    flexShrink: 0,
+    minWidth: 58,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  confidenceLabel: {
+    color: COLORS.teal,
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+  },
+  confidence: {
+    color: COLORS.teal,
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 1,
+  },
   statusLegend: {
     backgroundColor: COLORS.paper,
     borderRadius: 10,
-    marginTop: 14,
-    padding: 12,
+    marginTop: 12,
+    padding: 10,
   },
   statusLegendTitle: {
     color: COLORS.muted,
