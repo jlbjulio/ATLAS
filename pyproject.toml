@@ -9,10 +9,19 @@ requires-python = ">=3.11"
 dependencies = [
     "pydantic==2.13.4",
     "rapidfuzz==3.14.3",
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "python-multipart==0.0.20",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[project.optional-dependencies]
+test = [
+    "pytest==8.3.2",
+    "httpx==0.28.1",
+]
 
 [tool.pytest.ini_options]
 addopts = "-q"

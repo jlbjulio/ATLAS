@@ -1,1 +1,0 @@
-"""ATLAS desktop interface."""

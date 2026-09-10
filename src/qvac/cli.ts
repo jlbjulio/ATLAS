@@ -28,7 +28,7 @@ async function run(): Promise<void> {
     const paths = [
       "models/vision/visionpsy-nano-460m-flash-q4_k_m-imat.gguf",
       "models/vision/mmproj-visionpsy-nano-460m-flash-q8.gguf",
-      "models/language/qwen3-1.7b-q4_0.gguf",
+      "models/language/qwen3-0.6b-q4_0.gguf",
       "models/speech/whisper-small-q8_0.bin",
       "models/embeddings/embeddinggemma-300m-q8_0.gguf",
     ];

@@ -3,7 +3,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["node_modules/**", "runtime-data/**"] },
+  { ignores: ["node_modules/**", ".venv/**", "runtime-data/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

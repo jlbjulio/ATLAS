@@ -24,3 +24,14 @@ artifacts/private/
 artifacts/tmp/
 models/*
 !models/.gitignore
+
+# Local agent skills (not shared)
+.agents/
+.skills/
+skills-lock.json
+
+# Local agent context (not shared)
+AGENTS.md
+
+# Local Python environment
+.venv/
