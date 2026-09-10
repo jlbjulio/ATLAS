@@ -65,11 +65,27 @@ Abre `http://localhost:5173` y confirma `GET /api/health` desde la interfaz ante
 4. **Revisión humana:** corrige un campo, conserva los desconocidos y confirma el registro.
 5. **Resultado:** abre Base Instalada para mostrar el nuevo activo, su evidencia, estados y oportunidad de revisión.
 
-No presentes como implementado: delegación P2P, sincronización entre teléfono y laptop, ni análisis visual móvil. Son siguientes incrementos; el flujo web sí procesa fotografía local con VisionPsy.
+No presentes como implementado: sincronización de registros entre teléfono y laptop, análisis visual móvil, descubrimiento automático entre redes, ni cómputo repartido de una misma inferencia. El P2P actual delega una tarea completa de texto o audio a una laptop emparejada en la misma red.
 
 ## Aplicación móvil
 
-El móvil demuestra captura de texto y voz con QVAC en el dispositivo. Para generar un APK sigue [`mobile/README.md`](mobile/README.md). Antes de la demo descarga los modelos en el teléfono, ya que la primera carga requiere conectividad.
+El móvil demuestra captura de texto y voz con QVAC en el dispositivo, o delegación P2P a una laptop de la misma red. Para generar un APK sigue [`mobile/README.md`](mobile/README.md). Antes de la demo descarga los modelos en el teléfono, ya que el fallback local requiere que estén disponibles.
+
+### Potencia compartida (laptop + móvil)
+
+1. Conecta laptop y Android a una Wi-Fi privada de la demo.
+2. Abre el dashboard de ATLAS en la laptop usando su **IP local**, no `localhost`. Arranca el backend expuesto a la LAN:
+
+```bash
+export ATLAS_P2P_PAIRING_CODE='un-codigo-unico-de-demo'
+.venv/bin/python -m uvicorn web.server.main:app --host 0.0.0.0 --port 8000
+```
+
+3. En el dashboard pulsa **Compartir** dentro de la tarjeta *Potencia compartida*. Se muestra un código QR.
+4. En ATLAS Field pulsa **Conectar** y escanea el QR. Los dispositivos se enlazan sin IPs ni códigos visibles.
+5. Dicta o extrae texto. ATLAS usa la laptop automáticamente; si no responde, vuelve al móvil sin interrumpir el flujo.
+
+El enlace es de un solo uso y expira en 5 minutos. El token de sesión no se guarda en el móvil, vive sólo en memoria en la laptop y expira en 60 minutos. HTTP sin TLS es únicamente para una red privada y controlada de demo; para cualquier despliegue real usa HTTPS e identidad de dispositivo.
 
 ## Recuperación rápida
 
