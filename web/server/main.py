@@ -11,10 +11,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = PROJECT_ROOT / "src"
@@ -30,6 +30,7 @@ from atlas.infrastructure.database.sqlite import SQLiteDatabase  # noqa: E402
 from atlas.infrastructure.qvac.pipeline import CapturePipeline  # noqa: E402
 from atlas.infrastructure.qvac.runtime import QvacRuntime  # noqa: E402
 from atlas.infrastructure.repositories.observations import ObservationRepository  # noqa: E402
+from web.server.p2p import pairing_manager  # noqa: E402
 
 
 class HealthResponse(BaseModel):
@@ -55,6 +56,42 @@ class ExtractResponse(BaseModel):
 
 class TranscribeResponse(BaseModel):
     text: str
+
+
+class P2PPairRequest(BaseModel):
+    code: str = Field(min_length=8, max_length=128)
+    device_name: str = Field(min_length=1, max_length=80)
+
+
+class P2PPairResponse(BaseModel):
+    token: str
+    expires_at: str
+    capabilities: list[str]
+
+
+class P2PExtractRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=12_000)
+
+
+class P2PExtractionResponse(BaseModel):
+    equipments: list[dict]
+    missing_fields: list[str]
+    next_question: str | None
+    confidence: float
+
+
+class P2PInvitationCreate(BaseModel):
+    local_url: str = Field(pattern=r"^https?://")
+
+
+class P2PInvitationResponse(BaseModel):
+    code: str
+    invite_url: str
+    expires_at: str
+
+
+class P2PInvitationConsume(BaseModel):
+    code: str = Field(min_length=8, max_length=64)
 
 
 class SearchRequest(BaseModel):
@@ -143,6 +180,12 @@ def get_capture_service(
     return CaptureService(repo)
 
 
+def authorize_p2p(
+    token: Annotated[str | None, Header(alias="X-ATLAS-P2P-Token")] = None,
+) -> None:
+    pairing_manager.authorize(token)
+
+
 app = FastAPI(title="ATLAS API", version="0.1.0")
 
 app.add_middleware(
@@ -168,6 +211,81 @@ async def health() -> HealthResponse:
         sqlite_version="3.x",
         extraction_mode="adapter" if model_files["extraction-adapter"] else "base",
     )
+
+
+def extraction_for_mobile(extracted: dict) -> P2PExtractionResponse:
+    equipment = extracted.get("equipment", [])
+    equipments = [
+        {
+            "modality": item.get("modality") or "OTHER",
+            "brand": item.get("brand"),
+            "model": item.get("model"),
+            "ageYears": item.get("age_years"),
+            "quantity": item.get("quantity") or 1,
+            "confidence": item.get("confidence") or 0,
+            "status": item.get("status") or "Desconocido",
+        }
+        for item in equipment
+    ]
+    confidence = (
+        sum(item["confidence"] for item in equipments) / len(equipments)
+        if equipments
+        else 0
+    )
+    return P2PExtractionResponse(
+        equipments=equipments,
+        missing_fields=extracted.get("missing_fields", []),
+        next_question=extracted.get("next_question"),
+        confidence=confidence,
+    )
+
+
+@app.post("/api/p2p/pair", response_model=P2PPairResponse)
+async def pair_p2p(request: P2PPairRequest) -> P2PPairResponse:
+    token, expires_at = pairing_manager.pair(request.code)
+    logger.info("P2P provider paired with mobile device %s", request.device_name)
+    return P2PPairResponse(
+        token=token,
+        expires_at=expires_at.isoformat(),
+        capabilities=["extract", "transcribe"],
+    )
+
+
+@app.post("/api/p2p/invite", response_model=P2PInvitationResponse)
+async def create_invitation(request: P2PInvitationCreate) -> P2PInvitationResponse:
+    code, invite = pairing_manager.create_invitation(request.local_url)
+    invite_url = f"{request.local_url.rstrip('/')}/pair/{code}"
+    logger.info("P2P invitation created")
+    return P2PInvitationResponse(
+        code=code,
+        invite_url=invite_url,
+        expires_at=invite["expires_at"],
+    )
+
+
+@app.post("/api/p2p/invite/consume", response_model=dict)
+async def consume_invitation(request: P2PInvitationConsume) -> dict:
+    invite = pairing_manager.consume_invitation(request.code)
+    if not invite:
+        raise HTTPException(status_code=401, detail="Invitación inválida, usada o expirada.")
+    return {
+        "local_url": invite["local_url"],
+        "code": invite["code"],
+    }
+
+
+@app.post("/api/p2p/extract", response_model=P2PExtractionResponse)
+async def p2p_extract(
+    request: P2PExtractRequest,
+    _: Annotated[None, Depends(authorize_p2p)],
+    runtime: Annotated[QvacRuntime, Depends(get_qvac_runtime)],
+) -> P2PExtractionResponse:
+    require_models("qwen3-0.6b")
+    try:
+        return extraction_for_mobile(runtime.run("extract", text=request.text))
+    except Exception as error:
+        logger.exception("P2P extraction failed")
+        raise HTTPException(status_code=500, detail="La extracción P2P falló.") from error
 
 
 @app.get("/api/installed-base")
@@ -339,6 +457,33 @@ async def transcribe_audio(
             pass
 
     return TranscribeResponse(text=text)
+
+
+@app.post("/api/p2p/transcribe", response_model=TranscribeResponse)
+async def p2p_transcribe(
+    file: Annotated[UploadFile, File(...)],
+    _: Annotated[None, Depends(authorize_p2p)],
+    runtime: Annotated[QvacRuntime, Depends(get_qvac_runtime)],
+) -> TranscribeResponse:
+    require_models("whisper-small", "silero-vad")
+    content = await file.read()
+    if not content or len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="El audio debe pesar entre 1 byte y 20 MB.")
+    suffix = audio_suffix_for_runtime(file.filename)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+    try:
+        result = runtime.run("transcribe", audio=tmp_path)
+        return TranscribeResponse(text=result.get("text", ""))
+    except Exception as error:
+        logger.exception("P2P transcription failed")
+        raise HTTPException(status_code=500, detail="La transcripción P2P falló.") from error
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 @app.post("/api/capture/confirm")
