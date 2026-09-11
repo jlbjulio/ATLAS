@@ -35,3 +35,6 @@ AGENTS.md
 
 # Local Python environment
 .venv/
+
+# Local Remotion video project (not shared)
+video/

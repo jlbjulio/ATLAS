@@ -76,19 +76,19 @@ Si el comando no devuelve un PID, la aplicación se cerró. Para investigar, con
 
 1. Captura cliente, ciudad y observacion escrita.
 2. Dictado con Whisper Tiny local.
-3. Evidencia fotografica de equipos o placas autorizadas.
-4. Extraccion estructurada con Qwen3 600M local.
-5. Revision y edicion humana de cada equipo.
-6. Persistencia SQLite offline con estado local.
-7. Delegación P2P opcional de texto y audio a una laptop QVAC emparejada en la misma Wi-Fi, con fallback local automático.
+3. Evidencia fotográfica de equipos o placas autorizadas.
+4. Extracción estructurada con Qwen3 600M local y visión VisionPsy Nano local bajo demanda.
+5. Revisión y edición humana de cada equipo.
+6. Persistencia SQLite sin conexión con estado local.
+7. Delegación P2P opcional de texto y audio a una laptop QVAC emparejada en la misma Wi-Fi, con respaldo local automático.
+8. Sincronización de la cola local hacia la laptop emparejada mediante `POST /api/p2p/sync`.
 
-Las fotos no se envian a ningun servicio y la app muestra una advertencia para retirar pacientes, gafetes, expedientes o personas antes de confirmar.
+Las fotos no se envían a ningún servicio: la visión local corre en el dispositivo y la app muestra una advertencia para retirar pacientes, gafetes, expedientes o personas antes de confirmar.
 
 ## Limitaciones actuales
 
-- Vision QVAC en móvil queda como siguiente incremento. La delegación P2P actual ejecuta una tarea completa en la laptop; no divide un mismo modelo entre dispositivos.
-- La sincronizacion del outbox aun no tiene transporte movil; las observaciones quedan guardadas localmente.
-- El modelo de extraccion nunca marca datos como `Confirmado`; esa decision sigue siendo humana.
+- La delegación P2P actual ejecuta una tarea completa en la laptop; no divide un mismo modelo entre dispositivos.
+- El modelo de extracción nunca marca datos como `Confirmado`; esa decisión sigue siendo humana.
 
 ## Potencia compartida de demo
 
@@ -99,6 +99,6 @@ export ATLAS_P2P_PAIRING_CODE='un-codigo-unico-de-demo'
 .venv/bin/python -m uvicorn web.server.main:app --host 0.0.0.0 --port 8000
 ```
 
-Abre el dashboard de ATLAS en la laptop usando su **IP local** (no `localhost`) y pulsa **Compartir** en la tarjeta *Potencia compartida*. Se muestra un código QR. En el móvil pulsa **Conectar** y escanea el QR; no hace falta escribir IPs ni códigos. ATLAS envía sólo texto o el audio de la captura directamente a esa laptop y conserva QVAC local como fallback.
+Abre el panel de ATLAS en la laptop usando su **IP local** (no `localhost`) y presiona **Compartir** en la tarjeta *Potencia compartida*. Se muestra un código QR. En el celular presiona **Conectar** y escanea el QR; no hace falta escribir IPs ni códigos. ATLAS envía sólo texto o el audio de la captura directamente a esa laptop y conserva QVAC local como respaldo.
 
-El enlace QR es de un solo uso y expira en 5 minutos. El token de sesión no se persiste en el móvil, vive sólo en memoria en la laptop y expira en 60 minutos. `usesCleartextTraffic` está habilitado sólo para la LAN de demo. No uses HTTP P2P en una red no confiable o para datos reales; un despliegue requiere HTTPS e identidad de dispositivo.
+El enlace QR es de un solo uso y expira en 5 minutos. El token de sesión no se persiste en el celular, vive sólo en memoria en la laptop y expira en 60 minutos. `usesCleartextTraffic` está habilitado sólo para la LAN de demo. No uses HTTP P2P en una red no confiable o para datos reales; un despliegue requiere HTTPS e identidad de dispositivo.

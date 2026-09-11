@@ -9,26 +9,32 @@ Fotografía autorizada + voz o texto
 → comprensión multimodal local
 → registro estructurado con evidencia
 → pregunta por el dato de mayor valor
-→ detección de duplicados y conflictos
 → revisión humana
-→ historial auditable y cola local de sincronización
-→ Customer 360, calidad de datos y oportunidades
+→ historial auditable y sincronización local
+→ Customer 360 y calidad de datos
 ```
 
 Una captura puede producir varios registros cuando se observan equipos de diferentes modalidades, marcas, modelos o edades. ATLAS conserva los valores desconocidos, nunca fusiona activos automáticamente y permite rastrear cada dato hasta su evidencia original.
 
-## Capacidades
+## Capacidades del MVP
 
 - **Smart Capture:** captura mediante fotografía, voz o texto aun sin conexión.
 - **Asset Identity:** cliente, ubicación, modalidad, cantidad, fabricante, modelo, serie y antigüedad.
 - **Next Best Question:** pregunta únicamente por el dato faltante que más valor aporta.
-- **Confidence Engine:** puntaje explicable según completitud, evidencia, vigencia y confirmaciones independientes.
-- **Entity Resolution:** encuentra duplicados y contradicciones sin alterar los registros originales.
-- **Customer 360:** presenta la base instalada, su calidad y la última observación por cliente.
-- **Territory Intelligence:** agrega modalidades, fabricantes y antigüedad por ciudad o país.
-- **Opportunity Radar:** prioriza revisiones de renovación y actualización sin convertirlas en afirmaciones comerciales automáticas.
-- **Evidence Ledger:** mantiene versiones, evidencia y una cadena local de auditoría verificable.
-- **Offline Outbox:** conserva eventos idempotentes para integrarlos posteriormente con el transporte de sincronización elegido.
+- **Confidence Engine:** puntaje explicable según completitud y evidencia.
+- **Customer 360:** base instalada por cliente con última observación y calidad de datos.
+- **Evidence Ledger:** evidencia, campos confirmados y trazabilidad hasta la captura original.
+- **Offline Outbox:** guardado local inmediato en SQLite con sincronización manual/exportable.
+- **Potencia compartida (P2P):** la laptop actúa como proveedor de inferencia para el celular vía QR en la red local, con lista de dispositivos enlazados.
+- **Visión local en el celular:** captura de placas y etiquetas con VisionPsy Nano en el dispositivo.
+- **Sincronización al celular:** la cola local de observaciones se envía a la laptop emparejada.
+
+## En roadmap
+
+- **Entity Resolution:** detección de duplicados y contradicciones sin alterar registros originales.
+- **Territory Intelligence:** agregación de modalidades, fabricantes y antigüedad por ciudad o país.
+- **Opportunity Radar:** priorización de revisiones de renovación y actualización.
+- **Offline Outbox automático:** cola de eventos idempotentes con reintentos y transporte configurable.
 
 ## Inteligencia local
 
@@ -81,6 +87,27 @@ python -m atlas.main summary
 npm run qvac:health
 ```
 
+### Interfaz web
+
+```console
+npm install
+npm run dev
+```
+
+### App para celular (Android)
+
+Desde `mobile/`, después de configurar el entorno Android:
+
+```console
+cd mobile
+npm install
+npm run prebuild -- --platform android
+cd android
+./gradlew assembleRelease
+```
+
+El APK resultante queda en `mobile/android/app/build/outputs/apk/release/app-release.apk`.
+
 Los pesos se descargan y verifican con `tools/download-models.js`. Permanecen fuera de Git y sus rutas están declaradas en `config/models.json`.
 
 Para ejecutar una demostración reproducible consulta [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md). El adaptador LoRA es opcional: ATLAS usa el modelo base local cuando no hay un adaptador evaluado disponible.
@@ -120,3 +147,63 @@ El prototipo del commit `c0d250f` forma parte de la base preexistente. Toda nuev
 - TensorBoard y TensorBoardX para seguimiento local del entrenamiento.
 
 Las versiones exactas se encuentran en `package.json`, `package-lock.json` y `python-requirements.txt`. La licencia MIT cubre únicamente el código propio; los archivos, modelos y componentes externos conservan sus condiciones originales.
+
+## Demo del celular desde WSL
+
+Cuando el backend y la interfaz web corren dentro de WSL, el celular no puede alcanzar directamente la IP virtual de WSL (`192.168.x.x` asignada a la interfaz virtual). Es necesario exponer los puertos en Windows mediante `portproxy` y abrir el firewall.
+
+### 1. Redirigir puertos de Windows a WSL
+
+Abrir PowerShell como administrador y ejecutar:
+
+```powershell
+$wsl_ip = (wsl hostname -I).Trim().Split()[0]
+
+netsh interface portproxy delete v4tov4 listenport=8000 listenaddress=0.0.0.0
+netsh interface portproxy add v4tov4 listenport=8000 listenaddress=0.0.0.0 connectport=8000 connectaddress=$wsl_ip
+
+netsh interface portproxy delete v4tov4 listenport=5173 listenaddress=0.0.0.0
+netsh interface portproxy add v4tov4 listenport=5173 listenaddress=0.0.0.0 connectport=5173 connectaddress=$wsl_ip
+
+New-NetFirewallRule -DisplayName "ATLAS Backend 8000" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue
+New-NetFirewallRule -DisplayName "ATLAS Web 5173" -Direction Inbound -LocalPort 5173 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue
+
+netsh interface portproxy show all
+```
+
+Los errores "The system cannot find the file specified" al borrar reglas son normales si no existían reglas previas.
+
+### 2. Levantar servicios en WSL
+
+```bash
+cd /home/jgonz/projects/ATLAS
+
+# Backend
+source .venv/bin/activate
+ATLAS_P2P_PAIRING_CODE=codigo-demo uvicorn web.server.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Web (en otra terminal)
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+### 3. Conectar el celular
+
+Obtener la IP de la laptop en la red Wi-Fi (no la de WSL):
+
+```powershell
+ipconfig
+```
+
+Desde el navegador del celular, verificar:
+
+```text
+http://<IP_DE_LA_LAPTOP>:8000/api/health
+```
+
+Si carga, abrir la web en la laptop en `http://<IP_DE_LA_LAPTOP>:5173/`, generar el QR de "Potencia compartida" y escanearlo desde ATLAS Field.
+
+### Requisitos de red
+
+- El celular y la laptop deben estar en la misma red Wi-Fi.
+- Algunas redes "guest" bloquean comunicación entre dispositivos.
+- El firewall de Windows debe permitir los puertos 8000 y 5173.
