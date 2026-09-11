@@ -14,7 +14,7 @@ interface SplashScreenProps {
   duration?: number;
 }
 
-export function SplashScreen({ onFinish, duration = 5000 }: SplashScreenProps) {
+export function SplashScreen({ onFinish, duration = 3000 }: SplashScreenProps) {
   const insets = useSafeAreaInsets();
   const progress = useRef(new Animated.Value(0)).current;
   const fadeOut = useRef(new Animated.Value(1)).current;

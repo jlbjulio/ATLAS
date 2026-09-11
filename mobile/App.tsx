@@ -380,7 +380,7 @@ function FieldApp() {
   }
 
   if (showSplash) {
-    return <SplashScreen duration={4500} onFinish={() => setShowSplash(false)} />;
+    return <SplashScreen duration={3000} onFinish={() => setShowSplash(false)} />;
   }
 
   return (
