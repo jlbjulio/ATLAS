@@ -62,7 +62,7 @@ def test_confirmation_rejects_sensitive_content() -> None:
     assert "sensitive visual content" in response.json()["detail"]
 
 
-def test_p2p_pairing_requires_configured_code(monkeypatch) -> None:
+def test_p2p_pairing_rejects_invalid_code(monkeypatch) -> None:
     monkeypatch.delenv("ATLAS_P2P_PAIRING_CODE", raising=False)
 
     response = TestClient(app).post(
@@ -70,7 +70,7 @@ def test_p2p_pairing_requires_configured_code(monkeypatch) -> None:
         json={"code": "12345678", "device_name": "ATLAS Field"},
     )
 
-    assert response.status_code == 503
+    assert response.status_code == 401
 
 
 def test_p2p_delegates_extraction_to_local_qvac(tmp_path: Path, monkeypatch) -> None:
@@ -158,6 +158,65 @@ def test_p2p_invitation_can_be_created_and_consumed(monkeypatch) -> None:
 
     reused = client.post("/api/p2p/invite/consume", json={"code": payload["code"]})
     assert reused.status_code == 401
+
+
+def test_p2p_qr_invite_flow_pairs_and_delegates(monkeypatch) -> None:
+    monkeypatch.delenv("ATLAS_P2P_PAIRING_CODE", raising=False)
+
+    class FakeRuntime:
+        def run(self, command: str, **options) -> dict:
+            assert command == "extract"
+            assert options["text"] == "Tomógrafo Philips"
+            return {
+                "equipment": [
+                    {
+                        "modality": "CT",
+                        "brand": "PHILIPS",
+                        "model": "Ingenuity",
+                        "age_years": 8,
+                        "quantity": 1,
+                        "confidence": 0.95,
+                        "status": "Confirmado",
+                    }
+                ],
+                "missing_fields": [],
+                "next_question": None,
+            }
+
+    app.dependency_overrides[get_qvac_runtime] = lambda: FakeRuntime()
+    try:
+        client = TestClient(app)
+
+        created = client.post("/api/p2p/invite", json={"local_url": "http://192.168.1.20:8000"})
+        assert created.status_code == 200
+        code = created.json()["code"]
+
+        consumed = client.post("/api/p2p/invite/consume", json={"code": code})
+        assert consumed.status_code == 200
+
+        unpaired = client.post(
+            "/api/p2p/pair",
+            json={"code": "not-valid-code", "device_name": "ATLAS Field"},
+        )
+        assert unpaired.status_code == 401
+
+        paired = client.post(
+            "/api/p2p/pair",
+            json={"code": code, "device_name": "ATLAS Field"},
+        )
+        assert paired.status_code == 200
+        token = paired.json()["token"]
+
+        extracted = client.post(
+            "/api/p2p/extract",
+            headers={"X-ATLAS-P2P-Token": token},
+            json={"text": "Tomógrafo Philips"},
+        )
+        assert extracted.status_code == 200
+        assert extracted.json()["equipments"][0]["modality"] == "CT"
+        assert extracted.json()["confidence"] == 0.95
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_photo_analysis_uses_local_pipeline(tmp_path: Path) -> None:

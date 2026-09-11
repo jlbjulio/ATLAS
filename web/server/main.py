@@ -188,9 +188,22 @@ def authorize_p2p(
 
 app = FastAPI(title="ATLAS API", version="0.1.0")
 
+# Allow local dev origins and any private IPv4 address for the LAN demo.
+# In production this should be replaced with explicit HTTPS origins.
+_PRIVATE_ORIGIN_RE = (
+    r"http://("
+    r"localhost|"
+    r"127\.0\.0\.1|"
+    r"192\.168\.\d{1,3}\.\d{1,3}|"
+    r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|"
+    r"172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
+    r"):\d+"
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173"],
+    allow_origin_regex=_PRIVATE_ORIGIN_RE,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -43,14 +43,24 @@ class PairingManager:
         return invite
 
     def pair(self, code: str) -> tuple[str, datetime]:
+        # Manual pairing via the configured secret.
         expected = os.environ.get(PAIRING_CODE_ENV)
-        if not expected:
-            raise HTTPException(
-                status_code=503,
-                detail="El proveedor P2P no está habilitado en esta laptop.",
-            )
-        if not secrets.compare_digest(code, expected):
-            raise HTTPException(status_code=401, detail="Código de emparejamiento inválido.")
+        if expected and secrets.compare_digest(code, expected):
+            return self._issue_token()
+
+        # QR pairing via a consumed invitation.
+        invite = self._invites.get(code)
+        if invite:
+            if datetime.fromisoformat(invite["expires_at"]) <= datetime.now(UTC):
+                self._invites.pop(code, None)
+                raise HTTPException(status_code=401, detail="Invitación expirada.")
+            if not invite["used"]:
+                raise HTTPException(status_code=401, detail="Invitación aún no consumida.")
+            return self._issue_token()
+
+        raise HTTPException(status_code=401, detail="Código de emparejamiento inválido.")
+
+    def _issue_token(self) -> tuple[str, datetime]:
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now(UTC) + TOKEN_TTL
         self._tokens[token] = expires_at
