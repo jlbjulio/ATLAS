@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -216,6 +217,41 @@ class ObservationRepository:
                     _utc_iso(),
                 ),
             )
+
+    def list_duplicate_candidates(self) -> list[dict[str, object]]:
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT dc.id, dc.score, dc.reasons_json, dc.conflicts_json,
+                       dc.review_status, dc.created_at,
+                       incoming.modality AS incoming_modality,
+                       incoming.brand AS incoming_brand,
+                       incoming.model AS incoming_model,
+                       incoming.quantity AS incoming_quantity,
+                       incoming.age_years AS incoming_age_years,
+                       incoming.last_seen AS incoming_last_seen,
+                       existing.modality AS existing_modality,
+                       existing.brand AS existing_brand,
+                       existing.model AS existing_model,
+                       existing.quantity AS existing_quantity,
+                       existing.age_years AS existing_age_years,
+                       existing.last_seen AS existing_last_seen,
+                       c.name AS customer_name, c.city AS customer_city,
+                       c.country AS customer_country
+                FROM duplicate_candidates AS dc
+                JOIN assets AS incoming ON incoming.id = dc.incoming_asset_id
+                JOIN assets AS existing ON existing.id = dc.existing_asset_id
+                JOIN customers AS c ON c.id = incoming.customer_id
+                ORDER BY dc.score DESC, dc.created_at DESC
+                """
+            ).fetchall()
+        results = []
+        for row in rows:
+            data = dict(row)
+            data["reasons"] = json.loads(data.pop("reasons_json") or "[]")
+            data["conflicts"] = json.loads(data.pop("conflicts_json") or "[]")
+            results.append(data)
+        return results
 
     def list_assets(self, customer_id: str | None = None) -> list[InstalledAsset]:
         with self.database.connect() as connection:

@@ -66,7 +66,7 @@ export function SharedPowerCard() {
                 Potencia compartida
               </h3>
               <p className="text-sm text-primary-readable/80">
-                Enlaza el móvil con esta laptop para que ATLAS use el procesador
+                Enlaza el celular con esta laptop para que ATLAS use el procesador
                 más potente automáticamente.
               </p>
             </div>
@@ -78,7 +78,7 @@ export function SharedPowerCard() {
         </CardContent>
       </Card>
 
-      <Modal isOpen={isOpen} onClose={close} title="Enlazar móvil" size="sm">
+      <Modal isOpen={isOpen} onClose={close} title="Enlazar celular" size="sm">
         <div className="space-y-4 text-center">
           <p className="text-sm text-muted-foreground">
             Escanea este código desde ATLAS Field para enlazar los dispositivos.

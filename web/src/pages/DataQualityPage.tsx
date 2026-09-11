@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { DuplicatesCard } from "@/components/shared/DuplicatesCard"
 import { useInstalledBase } from "@/hooks/useInstalledBase"
 import { average } from "@/lib/format"
 
@@ -198,6 +199,8 @@ export function DataQualityPage() {
           </CardContent>
         </Card>
       </div>
+
+      <DuplicatesCard />
     </div>
   )
 }

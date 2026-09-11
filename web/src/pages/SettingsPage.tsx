@@ -253,16 +253,16 @@ export function SettingsPage() {
                       </p>
                     </div>
                     <div>
-                      <label className="mb-1.5 block text-sm font-medium text-foreground">Max Tokens</label>
+                      <label className="mb-1.5 block text-sm font-medium text-foreground">Tokens máximos</label>
                       <Input type="number" min={512} max={4096} step={512} defaultValue={2048} />
                     </div>
                     <div>
                       <Select
-                        label="Device Preference"
+                        label="Preferencia de dispositivo"
                         value="auto"
                         options={[
                           { value: "cpu", label: "CPU (compatible, más lento)" },
-                          { value: "gpu", label: "GPU (más rápido, requiere hardware)" },
+                          { value: "gpu", label: "GPU (más rápido, requiere GPU dedicada)" },
                           { value: "auto", label: "Auto (recomendado)" },
                         ]}
                       />
@@ -282,7 +282,7 @@ export function SettingsPage() {
                     <Badge variant="info">Activo</Badge>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Desde el dashboard puedes compartir el procesador de esta laptop con el móvil. El móvil escanea un código QR y ATLAS delega automáticamente texto y audio a la laptop, con fallback local si la conexión falla.
+                    Desde el panel puedes compartir el procesador de esta laptop con el celular. El celular escanea un código QR y ATLAS delega automáticamente texto y audio a la laptop, con respaldo local si la conexión falla.
                   </p>
                   <div className="flex items-center gap-3">
                     <input
@@ -296,7 +296,7 @@ export function SettingsPage() {
                       htmlFor="fallback-local"
                       className="text-sm text-muted-foreground"
                     >
-                      Fallback a inferencia local automático
+                      Respaldo automático a inferencia local
                     </label>
                   </div>
                 </div>
@@ -315,15 +315,15 @@ export function SettingsPage() {
               <CardContent className="space-y-6">
                 <div>
                   <h4 className="font-medium text-foreground mb-4">
-                    Backend Local (Python)
+                    Servidor local (Python)
                   </h4>
                   <div className="space-y-4">
                     <Input
-                      label="API Base URL"
+                      label="URL base de la API"
                       defaultValue="http://localhost:8000"
                     />
                     <Input
-                      label="WebSocket URL"
+                      label="URL de WebSocket"
                       defaultValue="ws://localhost:8000/ws"
                     />
                     {[
@@ -334,7 +334,7 @@ export function SettingsPage() {
                       },
                       {
                         id: "offline-first",
-                        label: "Modo offline-first (guardar local, sincronizar después)",
+                        label: "Modo sin conexión (guardar local, sincronizar después)",
                         defaultChecked: true,
                       },
                     ].map((item) => (
@@ -381,7 +381,7 @@ export function SettingsPage() {
                     {[
                       { value: "2.4 MB", label: "SQLite Local" },
                       { value: "18 MB", label: "Modelos QVAC" },
-                      { value: "5.2 MB", label: "Cache / Assets" },
+                      { value: "5.2 MB", label: "Caché / recursos" },
                     ].map((stat) => (
                       <div
                         key={stat.label}
@@ -523,7 +523,7 @@ export function SettingsPage() {
                   },
                   {
                     label: "Sincronización completada",
-                    desc: "Confirmación cuando el outbox se vacía correctamente",
+                    desc: "Confirmación cuando la cola de sincronización se vacía correctamente",
                     default: false,
                   },
                   {

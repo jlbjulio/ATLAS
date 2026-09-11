@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Mic, Loader2, Sparkles, X, Square } from "lucide-react";
+import { Mic, Sparkles, X, Square, Info } from "lucide-react";
 import {
   Button,
   Textarea,
@@ -76,6 +76,80 @@ const STATUS_OPTIONS = [
   { value: "UNKNOWN", label: "Desconocido" },
 ];
 
+const CLIENT_KEYWORDS = "(?:cliente)"
+const FACILITY_KEYWORDS = "(?:hospital|clínica|clinica|centro)"
+const CITY_KEYWORDS = "(?:ciudad|ubicación|ubicacion)"
+const COUNTRY_KEYWORDS = "(?:país|pais)"
+const NOTE_KEYWORDS =
+  "(?:observación|observacion|nota|evidencia|detalle|descripción|descripcion)"
+const ALL_KEYWORDS = [
+  "cliente",
+  "hospital",
+  "clínica",
+  "clinica",
+  "centro",
+  "ciudad",
+  "ubicación",
+  "ubicacion",
+  "país",
+  "pais",
+  "observación",
+  "observacion",
+  "nota",
+  "evidencia",
+  "detalle",
+  "descripción",
+  "descripcion",
+].join("|")
+
+function matchBlock(text: string, keyword: string): RegExpMatchArray | null {
+  return text.match(
+    new RegExp(
+      `${keyword}\\s*[,:]?\\s*(.+?)(?=\\s*(?:${ALL_KEYWORDS}|[,;.]|$))`,
+      "i",
+    ),
+  )
+}
+
+function parseVoiceCommands(text: string): Partial<CaptureFormData> {
+  const updates: Partial<CaptureFormData> = {}
+
+  const explicitClient = matchBlock(text, CLIENT_KEYWORDS)
+  if (explicitClient?.[1]) {
+    updates.clientName = explicitClient[1].trim()
+  } else {
+    // "Hospital San Juan" without the "Cliente" command keeps the full name.
+    const facilityClient = text.match(
+      new RegExp(
+        `^\\s*${FACILITY_KEYWORDS}\\s*(.+?)(?=\\s*(?:${ALL_KEYWORDS}|[,;.]|$))`,
+        "i",
+      ),
+    )
+    if (facilityClient?.[0]) {
+      updates.clientName = facilityClient[0].trim()
+    }
+  }
+
+  const cityMatch = matchBlock(text, CITY_KEYWORDS)
+  if (cityMatch?.[1]) {
+    updates.city = cityMatch[1].trim()
+  }
+
+  const countryMatch = matchBlock(text, COUNTRY_KEYWORDS)
+  if (countryMatch?.[1]) {
+    updates.country = countryMatch[1].trim()
+  }
+
+  const noteMatch = text.match(
+    new RegExp(`${NOTE_KEYWORDS}\\s*[,:]?\\s*(.+)`, "is"),
+  )
+  if (noteMatch?.[1]) {
+    updates.rawText = noteMatch[1].trim()
+  }
+
+  return updates
+}
+
 export function ObservationForm({
   onSubmit,
   isLoading = false,
@@ -120,7 +194,7 @@ export function ObservationForm({
   const validateForm = (): boolean => {
     const newErrors: Partial<Record<keyof CaptureFormData, string>> = {};
     if (!formData.rawText.trim() && !formData.photo) {
-      newErrors.rawText = "Añade una observación o una foto autorizada";
+      newErrors.rawText = "Agrega una observación o una foto autorizada";
     }
     if (!formData.clientName?.trim()) {
       newErrors.clientName = "El nombre del cliente es requerido";
@@ -146,7 +220,7 @@ export function ObservationForm({
 
   const handleExtract = async () => {
     if (!formData.rawText.trim() && !formData.photo) {
-      setErrors({ rawText: "Añade una observación o una foto autorizada" });
+      setErrors({ rawText: "Agrega una observación o una foto autorizada" });
       return;
     }
     if (formData.photo && !formData.photoAuthorized) {
@@ -211,11 +285,13 @@ export function ObservationForm({
               type: "audio/webm",
             });
             const transcribed = await onTranscribe(audioFile);
+            const commands = parseVoiceCommands(transcribed);
             setFormData((prev) => ({
               ...prev,
-              rawText: prev.rawText
-                ? `${prev.rawText} ${transcribed}`
-                : transcribed,
+              ...commands,
+              rawText:
+                commands.rawText ??
+                (prev.rawText ? `${prev.rawText} ${transcribed}` : transcribed),
             }));
           }
         } catch (err) {
@@ -254,7 +330,7 @@ export function ObservationForm({
   };
 
   const voiceStatus = isRecording
-    ? "Grabando... pulsa para detener"
+    ? "Grabando... presiona para detener"
     : isTranscribing
       ? "Transcribiendo localmente..."
       : (voiceError ?? "Dicta una observación y ATLAS la convertirá en texto");
@@ -288,6 +364,23 @@ export function ObservationForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary-readable" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  Dicta el formulario completo
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Di: <strong>Cliente</strong> Hospital San Juan,{" "}
+                  <strong>Ciudad</strong> Panamá, <strong>País</strong> Panamá,{" "}
+                  <strong>Observación</strong> (o <strong>Evidencia</strong>) vi
+                  un tomógrafo Philips de 8 años...
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <Input
               label="Cliente / Hospital"
@@ -322,7 +415,7 @@ export function ObservationForm({
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Observación (voz o texto)
+              Observación
             </label>
             <div className="relative">
               <Textarea
@@ -331,7 +424,7 @@ export function ObservationForm({
                   setFormData((prev) => ({ ...prev, rawText: e.target.value }))
                 }
                 error={errors.rawText}
-                placeholder="Describe lo que observaste: 'Estoy en Hospital DemoCare Pacific, en Panamá. Un tomógrafo Philips de unos 8 años. Uno de los resonadores parece de unos ocho años.'"
+                placeholder="Escribe o dicta lo que observaste. Usa el micrófono para llenar cliente, ciudad, país y observación por voz."
                 rows={4}
               />
               <div className="absolute bottom-2 right-2 flex gap-1">
@@ -341,6 +434,7 @@ export function ObservationForm({
                   size="sm"
                   onClick={handleRecordAudio}
                   disabled={isExtracting || isTranscribing}
+                  title="Dictar voz a texto"
                   aria-label={
                     isRecording
                       ? "Detener grabación"
@@ -351,26 +445,6 @@ export function ObservationForm({
                     <Square className="h-4 w-4" />
                   ) : (
                     <Mic className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleExtract}
-                  disabled={
-                    isExtracting ||
-                    (!formData.rawText.trim() && !formData.photo)
-                  }
-                  aria-label="Extraer información con IA"
-                >
-                  {isExtracting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      Extraer
-                    </>
                   )}
                 </Button>
               </div>
@@ -386,6 +460,20 @@ export function ObservationForm({
                 {errors.rawText}
               </p>
             )}
+          </div>
+
+          <div className="flex justify-center">
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleExtract}
+              loading={isExtracting}
+              disabled={!formData.rawText.trim() && !formData.photo}
+              className="w-full sm:w-auto"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Analizar con ATLAS
+            </Button>
           </div>
 
           <div>

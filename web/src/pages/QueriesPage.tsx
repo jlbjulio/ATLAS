@@ -21,9 +21,9 @@ import {
   Badge,
   StatusBadge,
   PageHeader,
-  EmptyState,
 } from "@/components/common"
 import { SearchForm } from "@/components/forms"
+import { LoadingMessages } from "@/components/common/LoadingMessages"
 import { api } from "@/services/api"
 import { mapSearchResponse } from "@/lib/mappers"
 import type { ClientInstalledBase, QueryIntent } from "@/types"
@@ -38,17 +38,6 @@ const exampleQueries = [
   "Equipos con confianza menor al 70%",
   "Resonadores Siemens instalados después de 2020",
 ]
-
-const intentLabels: Record<QueryIntent, string> = {
-  LIST_CLIENTS: "Listar clientes",
-  LIST_EQUIPMENT_BY_MODALITY: "Equipos por modalidad",
-  LIST_EQUIPMENT_BY_AGE: "Equipos por antigüedad",
-  LIST_EQUIPMENT_BY_BRAND: "Equipos por marca",
-  RENEWAL_OPPORTUNITIES: "Oportunidades de renovación",
-  DUPLICATES: "Duplicados",
-  CONFIDENCE_LOW: "Baja confianza",
-  UNKNOWN: "Consulta general",
-}
 
 const QUICK_STATS = [
   { label: "Total Equipos", key: "total_equipment", icon: Database, color: "blue" },
@@ -78,6 +67,7 @@ export function QueriesPage() {
     parsedIntent: QueryIntent
     results: ClientInstalledBase[]
     filters: Record<string, unknown>
+    naturalResponse: string
   } | null>(null)
   const [stats, setStats] = useState<{
     total_equipment: number
@@ -116,12 +106,13 @@ export function QueriesPage() {
 
     try {
       const response = await api.search(query)
-      const { results, filters, intent } = mapSearchResponse(response)
+      const { results, filters, intent, naturalResponse } = mapSearchResponse(response)
       setCurrentQuery({
         query,
         parsedIntent: (intent as QueryIntent) ?? "UNKNOWN",
         results,
         filters,
+        naturalResponse,
       })
     } catch (err) {
       console.error("Search error:", err)
@@ -143,13 +134,14 @@ export function QueriesPage() {
       setQueryError(null)
       try {
         const response = await api.search(initial)
-        const { results, filters, intent } = mapSearchResponse(response)
+        const { results, filters, intent, naturalResponse } = mapSearchResponse(response)
         if (!active) return
         setCurrentQuery({
           query: initial,
           parsedIntent: (intent as QueryIntent) ?? "UNKNOWN",
           results,
           filters,
+          naturalResponse,
         })
       } catch (err) {
         console.error("Search error:", err)
@@ -204,9 +196,6 @@ export function QueriesPage() {
     )
   }
 
-  const totalResults =
-    currentQuery?.results.reduce((sum, c) => sum + c.equipments.length, 0) ?? 0
-  const uniqueClients = currentQuery?.results.length ?? 0
 
   return (
     <div className="space-y-6">
@@ -252,7 +241,13 @@ export function QueriesPage() {
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <MessageCircle className="h-5 w-5 animate-pulse" />
               </div>
-              <span>ATLAS está preparando una respuesta con inferencia local...</span>
+              <LoadingMessages
+                messages={[
+                  "ATLAS está interpretando tu pregunta...",
+                  "Buscando en la base instalada local...",
+                  "Preparando una respuesta natural...",
+                ]}
+              />
             </div>
           )}
 
@@ -298,13 +293,9 @@ export function QueriesPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle>Esto encontré</CardTitle>
+                        <CardTitle>Respuesta de ATLAS</CardTitle>
                         <CardDescription>
-                          Interpreté tu pregunta como{" "}
-                          <strong>
-                            {intentLabels[currentQuery.parsedIntent]}
-                          </strong>{" "}
-                          · {uniqueClients} clientes · {totalResults} equipos
+                          {currentQuery.naturalResponse}
                         </CardDescription>
                       </div>
                       <div className="flex gap-2">
@@ -312,6 +303,7 @@ export function QueriesPage() {
                           variant="ghost"
                           size="sm"
                           onClick={handleExport}
+                          disabled={currentQuery.results.length === 0}
                         >
                           <Download className="w-4 h-4 mr-1" /> Exportar CSV
                         </Button>
@@ -327,12 +319,24 @@ export function QueriesPage() {
                   </CardHeader>
                   <CardContent>
                     {currentQuery.results.length === 0 ? (
-                      <EmptyState
-                        className="border-0 bg-transparent"
-                        icon={<Database className="h-6 w-6" />}
-                        title="Sin resultados"
-                        description="No se encontraron coincidencias. Prueba reformular la pregunta con otra modalidad, marca o país."
-                      />
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          No encontré equipos para mostrar. Prueba con alguna
+                          de estas consultas:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {exampleQueries.slice(0, 4).map((eq) => (
+                            <Button
+                              key={eq}
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleSearch(eq)}
+                            >
+                              {eq}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
                     ) : (
                       <div className="space-y-4">
                         {currentQuery.results.map((client) => (

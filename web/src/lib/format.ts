@@ -53,7 +53,7 @@ export function formatDate(value?: string): string {
   if (!value) return "—"
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleDateString("es-ES", {
+  return date.toLocaleDateString("es-MX", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -64,7 +64,7 @@ export function formatDateTime(value?: string): string {
   if (!value) return "—"
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleString("es-ES", {
+  return date.toLocaleString("es-MX", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",

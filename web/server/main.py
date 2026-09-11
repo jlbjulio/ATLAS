@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import sys
 import tempfile
 from collections import Counter
@@ -25,7 +26,14 @@ if str(SRC_ROOT) not in sys.path:
 
 from atlas.application.capture import CaptureService  # noqa: E402
 from atlas.application.search import InventoryFilters, compile_filters  # noqa: E402
-from atlas.domain.observations import ObservationDraft  # noqa: E402
+from atlas.domain.confidence import is_stale  # noqa: E402
+from atlas.domain.equipment import EquipmentCandidate  # noqa: E402
+from atlas.domain.observations import (  # noqa: E402
+    CaptureSource,
+    Evidence,
+    EvidenceKind,
+    ObservationDraft,
+)
 from atlas.infrastructure.database.sqlite import SQLiteDatabase  # noqa: E402
 from atlas.infrastructure.qvac.pipeline import CapturePipeline  # noqa: E402
 from atlas.infrastructure.qvac.runtime import QvacRuntime  # noqa: E402
@@ -94,6 +102,22 @@ class P2PInvitationConsume(BaseModel):
     code: str = Field(min_length=8, max_length=64)
 
 
+class P2PSyncObservation(BaseModel):
+    id: str
+    client: str
+    city: str
+    country: str
+    raw_text: str
+    audio_uri: str | None = None
+    photo_uri: str | None = None
+    extraction: dict
+    created_at: str
+
+
+class P2PSyncRequest(BaseModel):
+    observations: list[P2PSyncObservation]
+
+
 class SearchRequest(BaseModel):
     question: str
 
@@ -102,6 +126,7 @@ class SearchResponse(BaseModel):
     results: list[dict]
     filters_applied: dict
     intent: str
+    natural_response: str
 
 
 class DashboardStatsResponse(BaseModel):
@@ -109,8 +134,91 @@ class DashboardStatsResponse(BaseModel):
     total_clients: int
     pending_confirmations: int
     renewal_opportunities: int
+    stale_assets: int
+    duplicate_candidates: int
     by_modality: dict[str, int]
     status_counts: dict[str, int]
+
+
+def _build_natural_response(
+    question: str,
+    intent: str,
+    results: list[dict],
+    filters: InventoryFilters,
+) -> str:
+    total_equipment = sum(len(client.get("equipments", [])) for client in results)
+    unique_clients = len(results)
+
+    modality = filters.modality
+    brand = filters.brand
+    country = filters.country
+    city = filters.city
+    customer = filters.customer
+    min_age = filters.minimum_age_years
+    stale_only = filters.stale_only
+
+    if total_equipment == 0:
+        suggestions = [
+            "prueba con otra modalidad como MRI o CT",
+            "pregunta por otro país o ciudad",
+            "consulta por una marca diferente",
+        ]
+        return (
+            f"No encontré equipos que coincidan con tu consulta. "
+            f"{random.choice(suggestions)}."
+        )
+
+    parts: list[str] = []
+    if intent == "RENEWAL_OPPORTUNITIES":
+        parts.append(
+            f"Detecté {total_equipment} equipos con más de 7 años en {unique_clients} clientes. "
+            f"Son candidatos a revisión de renovación."
+        )
+    elif intent == "LIST_EQUIPMENT_BY_AGE":
+        parts.append(
+            f"Encontré {total_equipment} equipos con la antigüedad que indicaste, "
+            f"distribuidos en {unique_clients} clientes."
+        )
+    elif intent == "LIST_EQUIPMENT_BY_BRAND":
+        parts.append(
+            f"Hay {total_equipment} equipos {brand or ''} en {unique_clients} clientes."
+        )
+    elif intent == "LIST_EQUIPMENT_BY_MODALITY":
+        modality_label = modality or "la modalidad indicada"
+        parts.append(
+            f"Encontré {total_equipment} equipos de {modality_label} "
+            f"en {unique_clients} clientes."
+        )
+    elif intent == "LIST_CLIENTS":
+        parts.append(
+            f"Hay {unique_clients} clientes que coinciden con tu consulta, "
+            f"con un total de {total_equipment} equipos."
+        )
+    else:
+        parts.append(
+            f"Encontré {total_equipment} equipos en {unique_clients} clientes para tu consulta."
+        )
+
+    details: list[str] = []
+    if modality:
+        details.append(f"modalidad {modality}")
+    if brand:
+        details.append(f"marca {brand}")
+    if customer:
+        details.append(f"cliente {customer}")
+    elif city:
+        details.append(f"ciudad {city}")
+    elif country:
+        details.append(f"país {country}")
+    if min_age is not None:
+        details.append(f"antigüedad mayor a {min_age} años")
+    if stale_only:
+        details.append("más de 7 años")
+
+    if details:
+        parts[-1] += f" Filtré por: {', '.join(details)}."
+
+    return " ".join(parts)
 
 
 def get_model_files() -> dict[str, Path]:
@@ -255,13 +363,40 @@ def extraction_for_mobile(extracted: dict) -> P2PExtractionResponse:
 
 @app.post("/api/p2p/pair", response_model=P2PPairResponse)
 async def pair_p2p(request: P2PPairRequest) -> P2PPairResponse:
-    token, expires_at = pairing_manager.pair(request.code)
+    token, expires_at = pairing_manager.pair(request.code, request.device_name)
     logger.info("P2P provider paired with mobile device %s", request.device_name)
     return P2PPairResponse(
         token=token,
         expires_at=expires_at.isoformat(),
         capabilities=["extract", "transcribe"],
     )
+
+
+class P2PSession(BaseModel):
+    token: str
+    device_name: str
+    paired_at: str
+    last_seen: str
+    expires_at: str
+
+
+class P2PSessionsResponse(BaseModel):
+    sessions: list[P2PSession]
+
+
+@app.get("/api/p2p/sessions", response_model=P2PSessionsResponse)
+async def list_p2p_sessions() -> P2PSessionsResponse:
+    return P2PSessionsResponse(sessions=pairing_manager.list_sessions())
+
+
+class P2PRevokeRequest(BaseModel):
+    token: str = Field(min_length=8)
+
+
+@app.post("/api/p2p/sessions/revoke")
+async def revoke_p2p_session(request: P2PRevokeRequest) -> dict:
+    pairing_manager.revoke_session(request.token)
+    return {"ok": True}
 
 
 @app.post("/api/p2p/invite", response_model=P2PInvitationResponse)
@@ -324,20 +459,57 @@ async def dashboard_stats(
 ) -> DashboardStatsResponse:
     assets = repo.list_assets()
     customers = repo.customer_summary()
+    duplicates = repo.list_duplicate_candidates()
 
     total_equipment = len(assets)
     total_clients = len(customers)
     pending_confirmations = sum(1 for a in assets if a.status.value != "Confirmado")
     renewal_opportunities = sum(1 for a in assets if a.age_years and a.age_years > 7)
+    stale_assets = sum(1 for a in assets if is_stale(a.last_seen))
 
     return DashboardStatsResponse(
         total_equipment=total_equipment,
         total_clients=total_clients,
         pending_confirmations=pending_confirmations,
         renewal_opportunities=renewal_opportunities,
+        stale_assets=stale_assets,
+        duplicate_candidates=sum(
+            1 for d in duplicates if d.get("review_status") == "Pending"
+        ),
         by_modality=dict(Counter(asset.modality or "OTHER" for asset in assets)),
         status_counts=dict(Counter(asset.status.value for asset in assets)),
     )
+
+
+@app.get("/api/duplicates")
+async def list_duplicates(
+    repo: Annotated[ObservationRepository, Depends(get_observation_repo)],
+) -> list[dict]:
+    return repo.list_duplicate_candidates()
+
+
+@app.get("/api/stale")
+async def list_stale_assets(
+    repo: Annotated[ObservationRepository, Depends(get_observation_repo)],
+    days: int = 365,
+) -> list[dict]:
+    assets = repo.list_assets()
+    customers = {str(c["id"]): c for c in repo.customer_summary()}
+    stale = []
+    for asset in assets:
+        if not is_stale(asset.last_seen, max_days=days):
+            continue
+        customer = customers.get(asset.customer_id)
+        stale.append(
+            {
+                **asset.model_dump(mode="json"),
+                "customer_name": customer["name"] if customer else None,
+                "customer_city": customer["city"] if customer else None,
+                "customer_country": customer["country"] if customer else None,
+            }
+        )
+    stale.sort(key=lambda item: item["last_seen"])
+    return stale
 
 
 @app.post("/api/capture/extract", response_model=ExtractResponse)
@@ -499,6 +671,73 @@ async def p2p_transcribe(
             pass
 
 
+@app.post("/api/p2p/sync")
+async def p2p_sync(
+    request: P2PSyncRequest,
+    _: Annotated[None, Depends(authorize_p2p)],
+    service: Annotated[CaptureService, Depends(get_capture_service)],
+) -> dict:
+    synced = 0
+    errors: list[str] = []
+    for obs in request.observations:
+        try:
+            extraction = obs.extraction or {}
+            equipments = extraction.get("equipments", [])
+            evidence: list[Evidence] = []
+            if obs.audio_uri:
+                evidence.append(Evidence(kind=EvidenceKind.AUDIO))
+            if obs.photo_uri:
+                evidence.append(Evidence(kind=EvidenceKind.PHOTO))
+            if not evidence:
+                evidence.append(Evidence(kind=EvidenceKind.TEXT))
+
+            candidates = [
+                EquipmentCandidate(
+                    modality=item.get("modality"),
+                    brand=item.get("brand"),
+                    model=item.get("model"),
+                    age_years=item.get("ageYears"),
+                    quantity=item.get("quantity") or 1,
+                    status=item.get("status", "Desconocido"),
+                    confidence=item.get("confidence"),
+                )
+                for item in equipments
+            ]
+
+            if obs.photo_uri:
+                source = CaptureSource.IMPORT
+            elif obs.audio_uri:
+                source = CaptureSource.VOICE
+            else:
+                source = CaptureSource.TEXT
+
+            draft = ObservationDraft(
+                client=obs.client,
+                city=obs.city,
+                country=obs.country,
+                observer="ATLAS Field",
+                source=source,
+                raw_text=obs.raw_text,
+                equipment=candidates,
+                evidence=evidence,
+                missing_fields=extraction.get("missingFields", []),
+                next_question=extraction.get("nextQuestion"),
+            )
+            service.confirm(draft, actor="ATLAS Field")
+            synced += 1
+        except Exception as e:
+            logger.exception("P2P sync observation failed")
+            errors.append(f"{obs.id}: {e}")
+
+    if synced == 0 and errors:
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo sincronizar ninguna observación. {errors[0]}",
+        )
+
+    return {"synced": synced, "errors": errors}
+
+
 @app.post("/api/capture/confirm")
 async def confirm_capture(
     draft: dict,
@@ -515,7 +754,10 @@ async def confirm_capture(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Confirmation failed: {e}") from e
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo confirmar la observación: {e}",
+        ) from e
 
 
 @app.post("/api/search", response_model=SearchResponse)
@@ -549,10 +791,23 @@ async def search_inventory(
         intent = "LIST_CLIENTS"
     else:
         intent = "UNKNOWN"
-    return SearchResponse(results=results, filters_applied=filters.model_dump(), intent=intent)
+
+    natural_response = _build_natural_response(
+        request.question,
+        intent,
+        results,
+        filters,
+    )
+
+    return SearchResponse(
+        results=results,
+        filters_applied=filters.model_dump(),
+        intent=intent,
+        natural_response=natural_response,
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

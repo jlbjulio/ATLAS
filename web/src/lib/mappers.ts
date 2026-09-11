@@ -228,11 +228,13 @@ export function mapSearchResponse(response: SearchResponse): {
   results: ClientInstalledBase[];
   filters: Record<string, unknown>;
   intent: string;
+  naturalResponse: string;
 } {
   return {
     results: mapSearchResults(response.results),
     filters: response.filters_applied,
     intent: response.intent,
+    naturalResponse: response.natural_response,
   };
 }
 

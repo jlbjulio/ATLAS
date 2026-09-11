@@ -23,6 +23,7 @@ import {
   EquipmentTable,
 } from "@/components/common"
 import { SharedPowerCard } from "@/components/shared/SharedPowerCard"
+import { P2PSessionsCard } from "@/components/shared/P2PSessionsCard"
 import { api, type DashboardStats } from "@/services/api"
 import { useInstalledBase } from "@/hooks/useInstalledBase"
 import { average } from "@/lib/format"
@@ -121,10 +122,10 @@ export function DashboardPage() {
           </div>
           <div className="hidden text-right lg:block">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-readable">
-              Field Data
+              Datos de campo
             </p>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-              Real Impact
+              Impacto real
             </p>
           </div>
         </div>
@@ -161,7 +162,26 @@ export function DashboardPage() {
         />
       </div>
 
+      {(stats?.stale_assets ?? 0) > 0 && (
+        <button
+          type="button"
+          onClick={() => navigate("/opportunities")}
+          className="flex w-full items-start gap-3 rounded-lg border border-warning-soft-foreground/25 bg-warning-soft px-4 py-3 text-left text-sm text-warning-soft-foreground transition-colors hover:bg-warning-soft/80"
+        >
+          <Clock className="mt-0.5 h-5 w-5 shrink-0" />
+          <span>
+            <strong className="font-medium">
+              {stats?.stale_assets} equipos sin verificar recientemente.
+            </strong>{" "}
+            Han pasado más de 12 meses desde la última observación. Revísalos
+            para mantener la base instalada al día.
+          </span>
+        </button>
+      )}
+
       <SharedPowerCard />
+
+      <P2PSessionsCard />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card>

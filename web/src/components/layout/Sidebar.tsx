@@ -95,7 +95,7 @@ export function Sidebar() {
         <div className="flex h-16 items-center border-b border-sidebar-border px-6">
           <Link to="/" className="flex flex-col" aria-label="ATLAS Inicio">
             <img
-              src="/atlas.svg"
+              src="/atlaslogo.png"
               alt="ATLAS"
               className="h-auto w-28 dark:brightness-0 dark:invert"
             />
@@ -205,13 +205,13 @@ export function Sidebar() {
 
         <div className="space-y-1 border-t border-sidebar-border px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-muted">
-            Local AI
+            IA local
           </p>
           <p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-muted">
-            Real-world assets
+            Activos del mundo real
           </p>
           <p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-muted">
-            {"Tomorrow's decisions"}
+            Decisiones del mañana
           </p>
           <p className="pt-1 text-[10px] font-mono text-sidebar-muted/70">
             v0.1.0

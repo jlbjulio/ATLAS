@@ -256,7 +256,7 @@ export function InstalledBasePage() {
         ),
         cell: ({ row }) => (
           <span className="text-muted-foreground">
-            {new Date(row.original.lastVisit).toLocaleDateString("es-ES")}
+            {new Date(row.original.lastVisit).toLocaleDateString("es-MX")}
           </span>
         ),
       },
@@ -600,7 +600,7 @@ export function InstalledBasePage() {
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
                 Última visita:{" "}
-                {new Date(selectedClient.lastVisit).toLocaleDateString("es-ES")}
+                {new Date(selectedClient.lastVisit).toLocaleDateString("es-MX")}
               </span>
             </div>
             <div>

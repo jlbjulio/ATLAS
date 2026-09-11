@@ -26,13 +26,13 @@ export function useQVAC() {
       const response = await api.health();
       const health = mapHealth(response);
       if (!health.available) {
-        throw new Error("QVAC models not available. Run model download first.");
+        throw new Error("Los modelos QVAC no están disponibles. Descarga los modelos primero.");
       }
       setExtractionMode(health.extractionMode);
       setIsInitialized(true);
     } catch (error) {
       const msg =
-        error instanceof Error ? error.message : "Error initializing QVAC";
+        error instanceof Error ? error.message : "Error al inicializar QVAC";
       setInitError(msg);
       console.error("QVAC init error:", error);
     } finally {

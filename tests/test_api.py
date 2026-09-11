@@ -28,6 +28,16 @@ def test_api_returns_seeded_inventory(tmp_path: Path) -> None:
         assert payload["total_clients"] == 13
         assert payload["by_modality"]
         assert payload["status_counts"]
+        assert payload["stale_assets"] >= 0
+        assert payload["duplicate_candidates"] >= 0
+
+        duplicates = client.get("/api/duplicates")
+        assert duplicates.status_code == 200
+        assert isinstance(duplicates.json(), list)
+
+        stale = client.get("/api/stale", params={"days": 365})
+        assert stale.status_code == 200
+        assert isinstance(stale.json(), list)
     finally:
         app.dependency_overrides.clear()
 
@@ -215,6 +225,20 @@ def test_p2p_qr_invite_flow_pairs_and_delegates(monkeypatch) -> None:
         assert extracted.status_code == 200
         assert extracted.json()["equipments"][0]["modality"] == "CT"
         assert extracted.json()["confidence"] == 0.95
+
+        sessions = client.get("/api/p2p/sessions")
+        assert sessions.status_code == 200
+        payload = sessions.json()["sessions"]
+        session_tokens = [s["token"] for s in payload]
+        assert token in session_tokens
+        matching = next(s for s in payload if s["token"] == token)
+        assert matching["device_name"] == "ATLAS Field"
+        assert "last_seen" in matching
+
+        revoked = client.post("/api/p2p/sessions/revoke", json={"token": token})
+        assert revoked.status_code == 200
+        assert revoked.json()["ok"] is True
+        assert token not in [s["token"] for s in client.get("/api/p2p/sessions").json()["sessions"]]
     finally:
         app.dependency_overrides.clear()
 

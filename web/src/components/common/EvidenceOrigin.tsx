@@ -41,7 +41,7 @@ export function EvidenceOrigin({
   if (!hasData) return null
 
   const dateLabel = createdAt
-    ? new Date(createdAt).toLocaleString("es-ES", {
+    ? new Date(createdAt).toLocaleString("es-MX", {
         dateStyle: "medium",
         timeStyle: "short",
       })

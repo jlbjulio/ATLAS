@@ -129,7 +129,7 @@ const sections = [
 const faqs = [
   {
     q: "¿Funciona sin conexión a internet?",
-    a: "Sí. ATLAS está diseñado para funcionar offline-first. La inferencia QVAC corre localmente en tu dispositivo (laptop o móvil). Los datos se guardan en SQLite local y se sincronizan cuando hay conexión.",
+    a: "Sí. ATLAS está diseñado para funcionar sin conexión. La inferencia QVAC corre localmente en tu dispositivo (laptop o celular). Los datos se guardan en SQLite local y se sincronizan cuando hay conexión.",
   },
   {
     q: "¿Qué modelos de IA usa ATLAS?",
@@ -137,10 +137,10 @@ const faqs = [
   },
   {
     q: "¿Cómo funciona la potencia compartida?",
-    a: "La laptop puede compartir su procesador con el móvil. Desde el dashboard se genera un código QR; al escanearlo desde ATLAS Field, ambos dispositivos se enlazan en la misma red Wi-Fi. ATLAS delega automáticamente texto y audio a la laptop más potente, y si la conexión falla continúa en el móvil.",
+    a: "La laptop puede compartir su procesador con el celular. Desde el panel se genera un código QR; al escanearlo desde ATLAS Field, ambos dispositivos se enlazan en la misma red Wi-Fi. ATLAS delega automáticamente texto y audio a la laptop más potente, y si la conexión falla continúa en el celular.",
   },
   {
-    q: "¿Puedo usar ATLAS en móvil?",
+    q: "¿Puedo usar ATLAS en el celular?",
     a: "Sí, hay una app Expo/React Native (separada) que usa @qvac/sdk/expo-plugin. Requiere dispositivo físico Android (minSdk 29) o iOS. No funciona en emulador.",
   },
   {

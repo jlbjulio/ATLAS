@@ -70,7 +70,7 @@ export function TopBar() {
         <div className="flex items-center gap-3">
           <Link to="/" className="lg:hidden" aria-label="ATLAS Inicio">
             <img
-              src="/atlas.svg"
+              src="/atlaslogo.png"
               alt="ATLAS"
               className="h-auto w-24 dark:brightness-0 dark:invert"
             />
@@ -179,7 +179,7 @@ export function TopBar() {
       {isMobileNavOpen && (
         <nav
           className="border-t border-border px-4 py-3 lg:hidden"
-          aria-label="Navegación móvil"
+          aria-label="Navegación del celular"
         >
           <div className="grid gap-1 sm:grid-cols-2">
             {mobileNav.map((item) => {

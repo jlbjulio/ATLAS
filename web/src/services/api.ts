@@ -9,7 +9,7 @@ interface ApiError extends Error {
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error: ApiError = new Error("API request failed");
+    const error: ApiError = new Error("La solicitud a la API falló");
     error.status = response.status;
     try {
       error.data = await response.json();
@@ -33,6 +33,12 @@ export const api = {
     typedFetch<InstalledBaseClient[]>(`${API_BASE}/installed-base`),
 
   dashboard: () => typedFetch<DashboardStats>(`${API_BASE}/dashboard`),
+
+  duplicates: () =>
+    typedFetch<DuplicateCandidate[]>(`${API_BASE}/duplicates`),
+
+  staleAssets: (days = 365) =>
+    typedFetch<StaleAsset[]>(`${API_BASE}/stale?days=${days}`),
 
   extract: (payload: {
     text: string;
@@ -98,6 +104,28 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ local_url: localUrl }),
     }),
+
+  listP2PSessions: () =>
+    typedFetch<P2PSessionsResponse>(`${API_BASE}/p2p/sessions`),
+
+  revokeP2PSession: (token: string) =>
+    typedFetch<{ ok: boolean }>(`${API_BASE}/p2p/sessions/revoke`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }),
+};
+
+export type P2PSession = {
+  token: string;
+  device_name: string;
+  paired_at: string;
+  last_seen: string;
+  expires_at: string;
+};
+
+export type P2PSessionsResponse = {
+  sessions: P2PSession[];
 };
 
 export type HealthResponse = {
@@ -125,8 +153,38 @@ export type DashboardStats = {
   total_clients: number;
   pending_confirmations: number;
   renewal_opportunities: number;
+  stale_assets: number;
+  duplicate_candidates: number;
   by_modality?: Record<string, number>;
   status_counts?: Record<string, number>;
+};
+
+export type DuplicateCandidate = {
+  id: string;
+  score: number;
+  reasons: string[];
+  conflicts: string[];
+  review_status: string;
+  created_at: string;
+  incoming_modality: string | null;
+  incoming_brand: string | null;
+  incoming_model: string | null;
+  incoming_quantity: number | null;
+  incoming_age_years: number | null;
+  existing_modality: string | null;
+  existing_brand: string | null;
+  existing_model: string | null;
+  existing_quantity: number | null;
+  existing_age_years: number | null;
+  customer_name: string | null;
+  customer_city: string | null;
+  customer_country: string | null;
+};
+
+export type StaleAsset = CoreEquipment & {
+  customer_name: string | null;
+  customer_city: string | null;
+  customer_country: string | null;
 };
 
 export type ExtractResponse = {
@@ -194,6 +252,7 @@ export type SearchResponse = {
   results: SearchResult[];
   filters_applied: Record<string, unknown>;
   intent: string;
+  natural_response: string;
 };
 
 export type P2PInvitationResponse = {
