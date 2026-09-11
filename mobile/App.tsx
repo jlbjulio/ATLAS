@@ -665,101 +665,108 @@ function FieldApp() {
           setManualMode(false);
         }}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View
             style={[
               styles.pairingSheet,
-              { paddingBottom: Math.max(insets.bottom, 12) + 22 },
+              { paddingBottom: Math.max(insets.bottom, 12) + 16 },
             ]}
           >
-            {qrScanning ? (
-              <>
-                <Text style={styles.pairingTitle}>Enlazar con laptop</Text>
-                <Text style={styles.pairingText}>
-                  Apunta la cámara al código QR de la laptop.
-                </Text>
-                <View style={styles.qrScannerContainer}>
-                  <CameraView
-                    style={styles.qrScanner}
-                    facing="back"
-                    barcodeScannerSettings={{
-                      barcodeTypes: ["qr"],
-                    }}
-                    onBarcodeScanned={handleBarcodeScanned}
-                  />
-                </View>
-                <Pressable
-                  onPress={() => setQrScanning(false)}
-                  style={styles.modalCancel}
-                >
-                  <Text style={styles.modalCancelText}>Cancelar escaneo</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <Text style={styles.pairingTitle}>Enlazar con laptop</Text>
-                <Text style={styles.pairingText}>
-                  Conecta ambos dispositivos a la misma Wi-Fi y escanea el código que muestra la laptop.
-                </Text>
-                <Pressable
-                  disabled={isPairing}
-                  onPress={startQrScanning}
-                  style={[
-                    styles.modalConnect,
-                    styles.qrButton,
-                    isPairing && styles.disabledButton,
-                  ]}
-                >
-                  {isPairing ? (
-                    <ActivityIndicator color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.modalConnectText}>
-                      Escanear código QR
-                    </Text>
-                  )}
-                </Pressable>
-                <Pressable
-                  onPress={() => setManualMode((current) => !current)}
-                  style={styles.modalToggle}
-                >
-                  <Text style={styles.modalToggleText}>
-                    {manualMode ? "Ocultar entrada manual" : "Ingresar manualmente"}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.sheetContent}
+            >
+              {qrScanning ? (
+                <>
+                  <Text style={styles.pairingTitle}>Enlazar con laptop</Text>
+                  <Text style={styles.pairingText}>
+                    Apunta la cámara al código QR de la laptop.
                   </Text>
-                </Pressable>
-                {manualMode && (
-                  <>
-                    <TextInput
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                      placeholder="http://192.168.1.20:8000"
-                      placeholderTextColor={COLORS.muted}
-                      value={providerUrl}
-                      onChangeText={setProviderUrl}
-                      style={styles.modalInput}
+                  <View style={styles.qrScannerContainer}>
+                    <CameraView
+                      style={styles.qrScanner}
+                      facing="back"
+                      barcodeScannerSettings={{
+                        barcodeTypes: ["qr"],
+                      }}
+                      onBarcodeScanned={handleBarcodeScanned}
                     />
-                    <TextInput
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      placeholder="Código de emparejamiento"
-                      placeholderTextColor={COLORS.muted}
-                      secureTextEntry
-                      value={pairingCode}
-                      onChangeText={setPairingCode}
-                      style={styles.modalInput}
-                    />
-                    <View style={styles.modalActions}>
-                      <Pressable
-                        onPress={() => setPairingOpen(false)}
-                        style={styles.modalCancel}
-                      >
-                        <Text style={styles.modalCancelText}>Cancelar</Text>
-                      </Pressable>
-                      <Pressable
-                        disabled={
-                          isPairing || !providerUrl.trim() || !pairingCode.trim()
-                        }
-                        onPress={handlePair}
+                  </View>
+                  <Pressable
+                    onPress={() => setQrScanning(false)}
+                    style={styles.modalCancel}
+                  >
+                    <Text style={styles.modalCancelText}>Cancelar escaneo</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.pairingTitle}>Enlazar con laptop</Text>
+                  <Text style={styles.pairingText}>
+                    Conecta ambos dispositivos a la misma Wi-Fi y escanea el código que muestra la laptop.
+                  </Text>
+                  <Pressable
+                    disabled={isPairing}
+                    onPress={startQrScanning}
+                    style={[
+                      styles.modalConnect,
+                      styles.qrButton,
+                      isPairing && styles.disabledButton,
+                    ]}
+                  >
+                    {isPairing ? (
+                      <ActivityIndicator color={COLORS.white} />
+                    ) : (
+                      <Text style={styles.modalConnectText}>
+                        Escanear código QR
+                      </Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setManualMode((current) => !current)}
+                    style={styles.modalToggle}
+                  >
+                    <Text style={styles.modalToggleText}>
+                      {manualMode ? "Ocultar entrada manual" : "Ingresar manualmente"}
+                    </Text>
+                  </Pressable>
+                  {manualMode && (
+                    <>
+                      <TextInput
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                        placeholder="http://192.168.1.20:8000"
+                        placeholderTextColor={COLORS.muted}
+                        value={providerUrl}
+                        onChangeText={setProviderUrl}
+                        style={styles.modalInput}
+                      />
+                      <TextInput
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        placeholder="Código de emparejamiento"
+                        placeholderTextColor={COLORS.muted}
+                        secureTextEntry
+                        value={pairingCode}
+                        onChangeText={setPairingCode}
+                        style={styles.modalInput}
+                      />
+                      <View style={styles.modalActions}>
+                        <Pressable
+                          onPress={() => setPairingOpen(false)}
+                          style={styles.modalCancel}
+                        >
+                          <Text style={styles.modalCancelText}>Cancelar</Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={
+                            isPairing || !providerUrl.trim() || !pairingCode.trim()
+                          }
+                          onPress={handlePair}
                         style={[
                           styles.modalConnect,
                           (isPairing ||
@@ -787,8 +794,9 @@ function FieldApp() {
                 )}
               </>
             )}
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -823,7 +831,7 @@ function ReviewCard({
         <View style={styles.reviewHeaderCopy}>
           <Text style={styles.sectionLabel}>04 / REVISIÓN HUMANA</Text>
           <Text style={styles.reviewTitle}>
-            {extraction.equipments.length} equipos candidatos
+            {(extraction.equipments ?? []).length} equipos candidatos
           </Text>
           <Text style={styles.reviewHint}>
             Revisa cada valor antes de guardarlo como registro local.
@@ -843,7 +851,7 @@ function ReviewCard({
           evidencia
         </Text>
       </View>
-      {extraction.equipments.map((equipment, index) => (
+      {(extraction.equipments ?? []).map((equipment, index) => (
         <View
           key={`${equipment.modality}-${index}`}
           style={styles.equipmentRow}
@@ -881,7 +889,7 @@ function ReviewCard({
           </View>
         </View>
       ))}
-      {(extraction.nextQuestion || extraction.missingFields.length > 0) && (
+      {(extraction.nextQuestion || (extraction.missingFields ?? []).length > 0) && (
         <View style={styles.followUp}>
           <Text style={styles.followUpLabel}>
             DATO PRIORITARIO POR CONFIRMAR
@@ -889,9 +897,9 @@ function ReviewCard({
           {extraction.nextQuestion && (
             <Text style={styles.followUpText}>{extraction.nextQuestion}</Text>
           )}
-          {extraction.missingFields.length > 0 && (
+          {(extraction.missingFields ?? []).length > 0 && (
             <Text style={styles.missingFields}>
-              También falta: {formatMissingFields(extraction.missingFields)}
+              También falta: {formatMissingFields(extraction.missingFields ?? [])}
             </Text>
           )}
         </View>
@@ -1334,6 +1342,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 22,
+    paddingTop: 20,
+    maxHeight: "85%",
+    width: "100%",
+  },
+  sheetContent: {
     gap: 12,
   },
   pairingTitle: { color: COLORS.ink, fontSize: 21, fontWeight: "700" },

@@ -10,7 +10,7 @@ import {
   type ModelProgressUpdate,
 } from "@qvac/sdk";
 
-import type { Extraction } from "./types";
+import type { EquipmentDraft, Extraction } from "./types";
 
 type ProgressHandler = (label: string, percentage: number) => void;
 
@@ -76,7 +76,18 @@ export async function extractObservation(note: string): Promise<Extraction> {
   const text = final.contentText.trim() || final.raw.fullText.trim();
   const json = text.match(/\{[\s\S]*\}/)?.[0];
   if (!json) throw new Error("QVAC no devolvió una extracción estructurada");
-  return JSON.parse(json) as Extraction;
+  const parsed = JSON.parse(json) as Extraction & { equipment?: EquipmentDraft[] };
+  // Some models return the field as singular "equipment".
+  if (!parsed.equipments && parsed.equipment) {
+    parsed.equipments = parsed.equipment;
+  }
+  if (!Array.isArray(parsed.equipments)) {
+    parsed.equipments = [];
+  }
+  if (!Array.isArray(parsed.missingFields)) {
+    parsed.missingFields = [];
+  }
+  return parsed;
 }
 
 export async function transcribeObservation(uri: string): Promise<string> {

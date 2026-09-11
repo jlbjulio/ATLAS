@@ -2,6 +2,7 @@ import { File } from "expo-file-system";
 
 import type { Extraction } from "./types";
 
+const CONNECT_TIMEOUT_MS = 8_000;
 const REQUEST_TIMEOUT_MS = 45_000;
 
 export type P2PProvider = {
@@ -41,22 +42,39 @@ function normalizeBaseUrl(baseUrl: string): string {
   return parsed.origin;
 }
 
-async function timedFetch(url: string, options: RequestInit): Promise<Response> {
+async function timedFetch(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("El proveedor P2P no respondió en 45 segundos.", {
-        cause: error,
-      });
+      throw new Error(
+        `El proveedor P2P no respondió en ${Math.round(timeoutMs / 1000)}s (${url}).`,
+        { cause: error },
+      );
     }
-    throw new Error("No se pudo conectar con el proveedor P2P en la red local.", {
-      cause: error,
-    });
+    throw new Error(
+      `No se pudo conectar con ${url}. Verifica que el móvil y la laptop estén en la misma red Wi-Fi.`,
+      { cause: error },
+    );
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function pingProvider(baseUrl: string): Promise<void> {
+  const response = await timedFetch(
+    `${baseUrl}/api/health`,
+    { method: "GET" },
+    CONNECT_TIMEOUT_MS,
+  );
+  if (!response.ok) {
+    throw new Error(`La laptop respondió pero no está lista (${baseUrl}).`);
   }
 }
 
@@ -98,11 +116,15 @@ export async function consumeInvitation(
     throw new Error("El enlace debe ser HTTP o HTTPS.");
   }
   const origin = parsed.origin;
-  const response = await timedFetch(`${origin}/api/p2p/invite/consume`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code: parsed.pathname.split("/").pop() || "" }),
-  });
+  const response = await timedFetch(
+    `${origin}/api/p2p/invite/consume`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: parsed.pathname.split("/").pop() || "" }),
+    },
+    CONNECT_TIMEOUT_MS,
+  );
   if (!response.ok) {
     throw new Error("La invitación no es válida, ya fue usada o expiró.");
   }
@@ -114,11 +136,15 @@ export async function pairWithProvider(
   code: string,
 ): Promise<P2PProvider> {
   const origin = normalizeBaseUrl(baseUrl);
-  const response = await timedFetch(`${origin}/api/p2p/pair`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code: code.trim(), device_name: "ATLAS Field" }),
-  });
+  const response = await timedFetch(
+    `${origin}/api/p2p/pair`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: code.trim(), device_name: "ATLAS Field" }),
+    },
+    CONNECT_TIMEOUT_MS,
+  );
   if (!response.ok) {
     throw new Error(
       response.status === 401
@@ -137,6 +163,8 @@ export async function pairWithInvitation(
   inviteUrl: string,
 ): Promise<P2PProvider> {
   const invite = await consumeInvitation(inviteUrl);
+  // Quick connectivity check before the full pair handshake.
+  await pingProvider(invite.local_url);
   return pairWithProvider(invite.local_url, invite.code);
 }
 
