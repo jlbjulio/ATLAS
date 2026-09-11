@@ -42,6 +42,7 @@ import {
   pairWithInvitation,
   type P2PProvider,
 } from "./src/p2p";
+import { SplashScreen } from "./src/components/SplashScreen";
 import type { EquipmentDraft, Extraction, LocalObservation } from "./src/types";
 
 type Tab = "capture" | "base";
@@ -81,6 +82,7 @@ export default function App() {
 
 function FieldApp() {
   const insets = useSafeAreaInsets();
+  const [showSplash, setShowSplash] = useState(true);
   const [tab, setTab] = useState<Tab>("capture");
   const [modelState, setModelState] = useState("Preparando inteligencia local");
   const [modelProgress, setModelProgress] = useState<number | null>(null);
@@ -375,6 +377,10 @@ function FieldApp() {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  if (showSplash) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
   return (
