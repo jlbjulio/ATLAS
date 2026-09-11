@@ -54,7 +54,7 @@ export async function listObservations(): Promise<LocalObservation[]> {
     audio_uri: string | null;
     photo_uri: string | null;
     extraction_json: string;
-    sync_state: "Local" | "Pendiente de enviar";
+    sync_state: "Local" | "Pendiente de enviar" | "Sincronizado";
     created_at: string;
   }>("SELECT * FROM observations ORDER BY created_at DESC");
 
@@ -70,4 +70,16 @@ export async function listObservations(): Promise<LocalObservation[]> {
     syncState: row.sync_state,
     createdAt: row.created_at,
   }));
+}
+
+export async function updateObservationSyncState(
+  id: string,
+  syncState: "Local" | "Pendiente de enviar" | "Sincronizado",
+): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    "UPDATE observations SET sync_state = ? WHERE id = ?",
+    syncState,
+    id,
+  );
 }

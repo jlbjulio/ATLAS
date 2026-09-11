@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-bg.png",
       "resizeMode": "cover",
       "backgroundColor": "#0D1B24"
     },
@@ -27,7 +27,7 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#0D1B24"
+        "backgroundColor": "#F3F6FA"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false

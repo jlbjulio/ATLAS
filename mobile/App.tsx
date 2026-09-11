@@ -8,7 +8,7 @@ import {
 } from "expo-audio";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Directory, File, Paths } from "expo-file-system";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,9 +28,10 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import { listObservations, saveObservation } from "./src/db";
+import { listObservations, saveObservation, updateObservationSyncState } from "./src/db";
 import {
   extractObservation,
+  extractObservationFromPhoto,
   initializeQVAC,
   shutdownQVAC,
   transcribeObservation,
@@ -40,9 +41,12 @@ import {
   delegateTranscription,
   pairWithProvider,
   pairWithInvitation,
+  syncObservations,
   type P2PProvider,
 } from "./src/p2p";
 import { SplashScreen } from "./src/components/SplashScreen";
+import { LoadingMessages } from "./src/components/LoadingMessages";
+import { parseVoiceCommands } from "./src/voiceCommands";
 import type { EquipmentDraft, Extraction, LocalObservation } from "./src/types";
 
 type Tab = "capture" | "base";
@@ -91,6 +95,7 @@ function FieldApp() {
   const [observations, setObservations] = useState<LocalObservation[]>([]);
   const [client, setClient] = useState("");
   const [city, setCity] = useState("");
+  const [country, setCountry] = useState("");
   const [note, setNote] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [audioUri, setAudioUri] = useState<string | null>(null);
@@ -109,6 +114,8 @@ function FieldApp() {
   );
   const [qrScanning, setQrScanning] = useState(false);
   const [manualMode, setManualMode] = useState(false);
+  const [extractionMode, setExtractionMode] = useState<"local" | "p2p">("local");
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
@@ -221,7 +228,15 @@ function FieldApp() {
       }
       text = text.trim();
       if (!text) throw new Error("No se detectó voz en la grabación");
-      setNote((current) => (current ? `${current}\n${text}` : text));
+      const commands = parseVoiceCommands(text);
+      if (commands.client) setClient(commands.client);
+      if (commands.city) setCity(commands.city);
+      if (commands.country) setCountry(commands.country);
+      if (commands.note) {
+        setNote(commands.note);
+      } else {
+        setNote((current) => (current ? `${current}\n${text}` : text));
+      }
       setModelState(provider ? "Proveedor P2P listo" : "Inferencia local lista");
     } catch (error) {
       Alert.alert(
@@ -236,20 +251,26 @@ function FieldApp() {
 
   async function handleExtract() {
     if (!note.trim() || !inferenceAvailable) return;
+    const useP2P = extractionMode === "p2p";
+    if (useP2P && !provider) {
+      Alert.alert("Laptop no conectada", "Empareja una laptop primero para usar extracción P2P.");
+      return;
+    }
     setIsExtracting(true);
     try {
       const context = `Cliente: ${client}\nCiudad: ${city}\nObservación: ${note}`;
-      if (provider) {
-        try {
-          setModelState("Delegando extracción a la laptop");
-          setExtraction(await delegateExtraction(provider, context));
-          setLastInference("p2p");
-        } catch (error) {
-          if (!isReady) throw error;
-          setModelState("Proveedor no disponible; procesando localmente");
-          setExtraction(await extractObservation(context));
-          setLastInference("local");
-        }
+      if (useP2P && provider) {
+        setModelState("Delegando extracción a la laptop");
+        setExtraction(await delegateExtraction(provider, context));
+        setLastInference("p2p");
+      } else if (photoUri) {
+        setModelState("Analizando la placa con visión local");
+        setExtraction(
+          await extractObservationFromPhoto(context, photoUri, (label, pct) =>
+            setModelState(`${label} ${pct}%`),
+          ),
+        );
+        setLastInference("local");
       } else {
         setModelState("Estructurando en el dispositivo");
         setExtraction(await extractObservation(context));
@@ -264,6 +285,41 @@ function FieldApp() {
       setModelState(provider ? "Proveedor P2P listo" : "Inferencia local lista");
     } finally {
       setIsExtracting(false);
+    }
+  }
+
+  async function handleSync() {
+    if (!provider) {
+      Alert.alert("Laptop no conectada", "Empareja una laptop primero para sincronizar.");
+      return;
+    }
+    const unsynced = observations.filter((o) => o.syncState !== "Sincronizado");
+    if (unsynced.length === 0) {
+      Alert.alert("Nada para sincronizar", "Todas las observaciones ya están en la laptop.");
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const result = await syncObservations(provider, unsynced);
+      if (result.synced > 0) {
+        for (const obs of unsynced.slice(0, result.synced)) {
+          await updateObservationSyncState(obs.id, "Sincronizado");
+        }
+        const updated = await listObservations();
+        setObservations(updated);
+      }
+      const message =
+        result.errors.length > 0
+          ? `${result.synced} sincronizadas. ${result.errors.length} con error.`
+          : `${result.synced} observaciones sincronizadas con la laptop.`;
+      Alert.alert("Sincronización", message);
+    } catch (error) {
+      Alert.alert(
+        "No se pudo sincronizar",
+        error instanceof Error ? error.message : "Error de red P2P",
+      );
+    } finally {
+      setIsSyncing(false);
     }
   }
 
@@ -346,12 +402,12 @@ function FieldApp() {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       client: client.trim(),
       city: city.trim(),
-      country: "",
+      country: country.trim(),
       rawText: note.trim(),
       audioUri,
       photoUri,
       extraction,
-      syncState: "Local",
+      syncState: "Pendiente de enviar",
       createdAt: new Date().toISOString(),
     };
     try {
@@ -359,6 +415,7 @@ function FieldApp() {
       setObservations((current) => [observation, ...current]);
       setClient("");
       setCity("");
+      setCountry("");
       setNote("");
       setAudioUri(null);
       setPhotoUri(null);
@@ -379,8 +436,10 @@ function FieldApp() {
     }
   }
 
+  const handleSplashFinish = useCallback(() => setShowSplash(false), []);
+
   if (showSplash) {
-    return <SplashScreen duration={3000} onFinish={() => setShowSplash(false)} />;
+    return <SplashScreen onFinish={handleSplashFinish} />;
   }
 
   return (
@@ -388,7 +447,7 @@ function FieldApp() {
       <StatusBar style="light" />
       <View style={styles.header}>
         <View>
-          <Text style={styles.eyebrow}>ATLAS / FIELD INTELLIGENCE</Text>
+          <Text style={styles.eyebrow}>ATLAS / INTELIGENCIA DE CAMPO</Text>
           <Text style={styles.title}>Visita de campo</Text>
         </View>
         <View
@@ -476,6 +535,16 @@ function FieldApp() {
               </Pressable>
             </View>
 
+            <View style={styles.voiceHintCard}>
+              <Text style={styles.voiceHintTitle}>
+                Dicta el formulario completo
+              </Text>
+              <Text style={styles.voiceHintText}>
+                Di: Cliente Hospital San Juan, Ciudad Panamá, País Panamá,
+                Observación (o Evidencia) vi un tomógrafo Philips de 8 años…
+              </Text>
+            </View>
+
             <Text style={styles.sectionLabel}>01 / CONTEXTO DE VISITA</Text>
             <View style={styles.card}>
               <TextInput
@@ -492,9 +561,16 @@ function FieldApp() {
                 placeholderTextColor={COLORS.muted}
                 style={styles.input}
               />
+              <TextInput
+                value={country}
+                onChangeText={setCountry}
+                placeholder="País"
+                placeholderTextColor={COLORS.muted}
+                style={styles.input}
+              />
             </View>
 
-            <Text style={styles.sectionLabel}>02 / EVIDENCIA</Text>
+            <Text style={styles.sectionLabel}>02 / OBSERVACIÓN</Text>
             <View style={styles.card}>
               <TextInput
                 value={note}
@@ -545,7 +621,7 @@ function FieldApp() {
               )}
               {audioUri && !recorderState.isRecording && !isTranscribing && (
                 <Text style={styles.audioNote}>
-                  Dictado transcrito {lastInference === "p2p" ? "por laptop P2P" : "localmente"} y añadido a la observación.
+                  Dictado transcrito {lastInference === "p2p" ? "por laptop P2P" : "localmente"} y agregado a la observación.
                 </Text>
               )}
               {photoUri && (
@@ -556,17 +632,64 @@ function FieldApp() {
               )}
             </View>
 
-            <Text style={styles.sectionLabel}>
-              03 / {provider ? "EXTRACCIÓN P2P" : "EXTRACCIÓN LOCAL"}
-            </Text>
+            <Text style={styles.sectionLabel}>03 / MODO DE EXTRACCIÓN</Text>
+            <View style={styles.modeSelector}>
+              <Pressable
+                onPress={() => setExtractionMode("local")}
+                style={[
+                  styles.modeButton,
+                  extractionMode === "local" && styles.modeButtonActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modeButtonText,
+                    extractionMode === "local" && styles.modeButtonTextActive,
+                  ]}
+                >
+                  QVAC local
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setExtractionMode("p2p")}
+                style={[
+                  styles.modeButton,
+                  extractionMode === "p2p" && styles.modeButtonActive,
+                  extractionMode === "p2p" && !provider && styles.modeButtonDisabled,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.modeButtonText,
+                    extractionMode === "p2p" && styles.modeButtonTextActive,
+                  ]}
+                >
+                  Laptop P2P
+                </Text>
+              </Pressable>
+            </View>
+            {extractionMode === "p2p" && !provider && (
+              <Text style={styles.modeHint}>
+                Empareja una laptop en la misma Wi-Fi para usar este modo.
+              </Text>
+            )}
+
             <Pressable
               disabled={
-                !inferenceAvailable || isExtracting || isTranscribing || !note.trim()
+                !inferenceAvailable ||
+                isExtracting ||
+                isTranscribing ||
+                (!note.trim() && !photoUri) ||
+                (extractionMode === "p2p" && !provider)
               }
               onPress={handleExtract}
               style={[
                 styles.primaryButton,
-                (!inferenceAvailable || isExtracting || isTranscribing || !note.trim()) &&
+                (!inferenceAvailable ||
+                  isExtracting ||
+                  isTranscribing ||
+                  (!note.trim() && !photoUri) ||
+                  (extractionMode === "p2p" && !provider)) &&
                   styles.disabledButton,
               ]}
             >
@@ -574,10 +697,27 @@ function FieldApp() {
                 <ActivityIndicator color={COLORS.white} />
               ) : (
                 <Text style={styles.primaryButtonText}>
-                    {provider ? "Estructurar con laptop P2P" : "Estructurar con QVAC local"}
+                  {photoUri
+                    ? "Analizar foto con visión local"
+                    : extractionMode === "p2p"
+                      ? "Estructurar con laptop"
+                      : "Estructurar localmente"}
                 </Text>
               )}
             </Pressable>
+
+            {isExtracting && (
+              <LoadingMessages
+                style={{ marginTop: 12 }}
+                messages={[
+                  "Analizando la evidencia…",
+                  "Identificando equipos y placas…",
+                  "Ejecutando niveles de confianza…",
+                  "Preguntando por el dato de mayor valor…",
+                  "Preparando registros para revisión…",
+                ]}
+              />
+            )}
 
             {extraction && (
               <ReviewCard
@@ -601,6 +741,26 @@ function FieldApp() {
               <Text style={styles.baseTitle}>
                 {observations.length} observaciones en este dispositivo
               </Text>
+              {observations.length > 0 && (
+                <Pressable
+                  onPress={handleSync}
+                  disabled={isSyncing || !provider}
+                  style={[
+                    styles.syncButton,
+                    (isSyncing || !provider) && styles.disabledButton,
+                  ]}
+                >
+                  {isSyncing ? (
+                    <ActivityIndicator color={COLORS.white} size="small" />
+                  ) : (
+                    <Text style={styles.syncButtonText}>
+                      {provider
+                        ? `Sincronizar ${observations.filter((o) => o.syncState !== "Sincronizado").length} pendientes con laptop`
+                        : "Conecta una laptop para sincronizar"}
+                    </Text>
+                  )}
+                </Pressable>
+              )}
             </>
           }
           ListEmptyComponent={
@@ -926,11 +1086,17 @@ function formatMissingFields(fields: string[]): string {
 }
 
 function ObservationRow({ item }: { item: LocalObservation }) {
+  const syncColor =
+    item.syncState === "Sincronizado"
+      ? styles.syncPillSuccess
+      : item.syncState === "Pendiente de enviar"
+        ? styles.syncPillPending
+        : styles.localPill;
   return (
     <View style={styles.observationRow}>
       <View style={styles.rowTop}>
         <Text style={styles.rowClient}>{item.client}</Text>
-        <Text style={styles.localPill}>{item.syncState}</Text>
+        <Text style={[styles.localPill, syncColor]}>{item.syncState}</Text>
       </View>
       <Text style={styles.rowMeta}>
         {item.city} · {new Date(item.createdAt).toLocaleDateString()}
@@ -1041,6 +1207,25 @@ const styles = StyleSheet.create({
     borderColor: COLORS.line,
     gap: 10,
   },
+  voiceHintCard: {
+    backgroundColor: COLORS.tealSoft,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(0, 125, 128, 0.25)",
+    padding: 14,
+    marginTop: 16,
+  },
+  voiceHintTitle: {
+    color: COLORS.ink,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  voiceHintText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
   providerCard: {
     backgroundColor: "#EAF2F5",
     borderRadius: 16,
@@ -1120,6 +1305,53 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   disabledButton: { opacity: 0.45 },
+  syncButton: {
+    backgroundColor: COLORS.navy,
+    borderRadius: 12,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    marginTop: 12,
+  },
+  syncButtonText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  modeSelector: {
+    flexDirection: "row",
+    backgroundColor: "rgba(0, 125, 128, 0.12)",
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 12,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 10,
+  },
+  modeButtonActive: {
+    backgroundColor: COLORS.teal,
+  },
+  modeButtonDisabled: {
+    opacity: 0.5,
+  },
+  modeButtonText: {
+    color: COLORS.teal,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  modeButtonTextActive: {
+    color: COLORS.white,
+  },
+  modeHint: {
+    color: COLORS.amber,
+    fontSize: 12,
+    marginBottom: 12,
+    textAlign: "center",
+  },
   reviewCard: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
@@ -1278,6 +1510,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     fontSize: 10,
     fontWeight: "700",
+  },
+  syncPillPending: {
+    color: COLORS.amber,
+    backgroundColor: "#FFF0D9",
+  },
+  syncPillSuccess: {
+    color: COLORS.teal,
+    backgroundColor: "#DFF3F1",
   },
   rowMeta: { color: COLORS.muted, fontSize: 12, marginTop: 4 },
   rowNote: { color: COLORS.ink, fontSize: 13, lineHeight: 19, marginTop: 10 },

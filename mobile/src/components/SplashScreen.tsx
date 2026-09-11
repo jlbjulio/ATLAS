@@ -1,50 +1,91 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
+  ImageBackground,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import iconImage from "../../assets/icon.png";
+import splashBackground from "../../assets/splash-bg.png";
+import wordmarkImage from "../../assets/wordmark.png";
 
 interface SplashScreenProps {
   onFinish: () => void;
   duration?: number;
 }
 
-export function SplashScreen({ onFinish, duration = 3000 }: SplashScreenProps) {
+export function SplashScreen({ onFinish, duration = 5500 }: SplashScreenProps) {
   const insets = useSafeAreaInsets();
   const progress = useRef(new Animated.Value(0)).current;
   const fadeOut = useRef(new Animated.Value(1)).current;
   const contentFade = useRef(new Animated.Value(0)).current;
+  const dotPulse = useRef(new Animated.Value(1)).current;
+  const [progressPercent, setProgressPercent] = useState(0);
+  const finishedRef = useRef(false);
 
   useEffect(() => {
-    const animation = Animated.sequence([
-      Animated.parallel([
-        Animated.timing(contentFade, {
-          toValue: 1,
-          duration: 400,
+    finishedRef.current = false;
+
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dotPulse, {
+          toValue: 0.4,
+          duration: 700,
           useNativeDriver: true,
         }),
-        Animated.timing(progress, {
+        Animated.timing(dotPulse, {
           toValue: 1,
-          duration,
-          useNativeDriver: false,
+          duration: 700,
+          useNativeDriver: true,
         }),
-      ]),
+      ])
+    );
+    pulse.start();
+
+    Animated.timing(contentFade, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+
+    const progressAnimation = Animated.timing(progress, {
+      toValue: 1,
+      duration,
+      useNativeDriver: false,
+    });
+
+    const progressListener = progress.addListener(({ value }) => {
+      setProgressPercent(Math.round(value * 100));
+    });
+
+    progressAnimation.start();
+
+    const fadeTimer = setTimeout(() => {
       Animated.timing(fadeOut, {
         toValue: 0,
-        duration: 400,
+        duration: 500,
         useNativeDriver: true,
-      }),
-    ]);
+      }).start();
+    }, duration);
 
-    animation.start(() => onFinish());
-    return () => animation.stop();
-  }, [duration, onFinish, progress, fadeOut, contentFade]);
+    const finishTimer = setTimeout(() => {
+      if (!finishedRef.current) {
+        finishedRef.current = true;
+        onFinish();
+      }
+    }, duration + 500);
+
+    return () => {
+      progress.removeListener(progressListener);
+      progressAnimation.stop();
+      pulse.stop();
+      clearTimeout(fadeTimer);
+      clearTimeout(finishTimer);
+    };
+  }, [duration, onFinish, progress, fadeOut, contentFade, dotPulse]);
 
   const widthInterpolated = progress.interpolate({
     inputRange: [0, 1],
@@ -53,18 +94,27 @@ export function SplashScreen({ onFinish, duration = 3000 }: SplashScreenProps) {
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeOut }]}>
-      <View style={styles.background}>
+      <ImageBackground
+        source={splashBackground}
+        style={styles.background}
+        resizeMode="cover"
+      >
+        <View style={styles.overlay} />
         <Animated.View
           style={[
             styles.content,
             { opacity: contentFade, marginTop: -insets.top },
           ]}
         >
-          <Image source={iconImage} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.brand}>ATLAS</Text>
+          <Image
+            source={wordmarkImage}
+            style={styles.logo}
+            resizeMode="contain"
+            tintColor="#FFFFFF"
+          />
           <Text style={styles.subBrand}>Field</Text>
           <Text style={styles.tagline}>
-            LOCAL AI · REAL-WORLD ASSETS · TOMORROW'S DECISIONS
+            IA LOCAL · ACTIVOS DEL MUNDO REAL · DECISIONES DEL MAÑANA
           </Text>
         </Animated.View>
 
@@ -74,14 +124,22 @@ export function SplashScreen({ onFinish, duration = 3000 }: SplashScreenProps) {
             { paddingBottom: Math.max(insets.bottom, 16) + 48 },
           ]}
         >
-          <Text style={styles.loadingText}>Cargando inteligencia local…</Text>
+          <View style={styles.loadingRow}>
+            <Animated.View
+              style={[styles.pulseDot, { opacity: dotPulse }]}
+            />
+            <Text style={styles.loadingText}>
+              Cargando inteligencia local
+            </Text>
+          </View>
           <View style={styles.progressTrack}>
             <Animated.View
               style={[styles.progressFill, { width: widthInterpolated }]}
             />
           </View>
+          <Text style={styles.percentText}>{progressPercent}%</Text>
         </View>
-      </View>
+      </ImageBackground>
     </Animated.View>
   );
 }
@@ -93,40 +151,43 @@ const styles = StyleSheet.create({
   },
   background: {
     flex: 1,
-    backgroundColor: "#0D1B24",
     justifyContent: "center",
     alignItems: "center",
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(13, 27, 36, 0.55)",
   },
   content: {
     alignItems: "center",
     justifyContent: "center",
   },
   logo: {
-    width: 140,
-    height: 140,
-    marginBottom: 20,
-  },
-  brand: {
-    color: "#FFFFFF",
-    fontSize: 42,
-    fontWeight: "300",
-    letterSpacing: 8,
+    width: 220,
+    height: 69,
+    marginBottom: 12,
   },
   subBrand: {
-    color: "#B8C5CC",
+    color: "#FFFFFF",
     fontSize: 22,
     fontWeight: "400",
     marginTop: 4,
     letterSpacing: 2,
+    textShadowColor: "rgba(0, 0, 0, 0.6)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   tagline: {
-    color: "#7A8B94",
+    color: "#DCE5E9",
     fontSize: 12,
     fontWeight: "500",
     letterSpacing: 1.5,
     marginTop: 24,
     textAlign: "center",
     paddingHorizontal: 32,
+    textShadowColor: "rgba(0, 0, 0, 0.6)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   progressWrapper: {
     position: "absolute",
@@ -136,10 +197,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 56,
     alignItems: "center",
   },
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#00BFA5",
+    marginRight: 10,
+  },
   loadingText: {
     color: "#B8C5CC",
-    fontSize: 13,
-    marginBottom: 12,
+    fontSize: 14,
   },
   progressTrack: {
     height: 5,
@@ -152,5 +224,10 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#FFFFFF",
     borderRadius: 3,
+  },
+  percentText: {
+    color: "#7A8B94",
+    fontSize: 11,
+    marginTop: 8,
   },
 });

@@ -2,7 +2,9 @@ import {
   completion,
   downloadAsset,
   loadModel,
+  MMPROJ_VISIONPSY_NANO_460M_MULTIMODAL_Q8_0,
   QWEN3_600M_INST_Q4,
+  VISIONPSY_NANO_460M_MULTIMODAL_Q4_K_M,
   WHISPER_TINY,
   VAD_SILERO_5_1_2,
   transcribe,
@@ -16,6 +18,7 @@ type ProgressHandler = (label: string, percentage: number) => void;
 
 let extractionModelId: string | null = null;
 let transcriptionModelId: string | null = null;
+let visionModelId: string | null = null;
 
 const EXTRACTION_PROMPT = `
 Eres el extractor local de ATLAS para observaciones de equipos médicos.
@@ -74,9 +77,41 @@ export async function extractObservation(note: string): Promise<Extraction> {
   });
   const final = await result.final;
   const text = final.contentText.trim() || final.raw.fullText.trim();
+  return parseExtraction(text);
+}
+
+async function ensureVisionModel(
+  onProgress?: ProgressHandler,
+): Promise<string> {
+  if (visionModelId) return visionModelId;
+
+  onProgress?.("Preparando modelo de visión", 0);
+  await downloadAsset({
+    assetSrc: VISIONPSY_NANO_460M_MULTIMODAL_Q4_K_M,
+    onProgress: progress("Visión", onProgress),
+  });
+  await downloadAsset({
+    assetSrc: MMPROJ_VISIONPSY_NANO_460M_MULTIMODAL_Q8_0,
+    onProgress: progress("Proyector visual", onProgress),
+  });
+
+  visionModelId = await loadModel({
+    modelSrc: VISIONPSY_NANO_460M_MULTIMODAL_Q4_K_M,
+    modelConfig: {
+      ctx_size: 1024,
+      device: "cpu",
+      projectionModelSrc: MMPROJ_VISIONPSY_NANO_460M_MULTIMODAL_Q8_0,
+    },
+  });
+  return visionModelId;
+}
+
+function parseExtraction(text: string): Extraction {
   const json = text.match(/\{[\s\S]*\}/)?.[0];
   if (!json) throw new Error("QVAC no devolvió una extracción estructurada");
-  const parsed = JSON.parse(json) as Extraction & { equipment?: EquipmentDraft[] };
+  const parsed = JSON.parse(json) as Extraction & {
+    equipment?: EquipmentDraft[];
+  };
   // Some models return the field as singular "equipment".
   if (!parsed.equipments && parsed.equipment) {
     parsed.equipments = parsed.equipment;
@@ -88,6 +123,31 @@ export async function extractObservation(note: string): Promise<Extraction> {
     parsed.missingFields = [];
   }
   return parsed;
+}
+
+export async function extractObservationFromPhoto(
+  note: string,
+  photoUri: string,
+  onProgress?: ProgressHandler,
+): Promise<Extraction> {
+  const modelId = await ensureVisionModel(onProgress);
+  // QVAC's native worker requires a filesystem path, not Expo's file URI.
+  const imagePath = decodeURIComponent(photoUri.replace(/^file:\/\//, ""));
+  const result = completion({
+    modelId,
+    history: [
+      { role: "system", content: EXTRACTION_PROMPT },
+      {
+        role: "user",
+        content: note.trim() || "Analiza la placa autorizada del equipo.",
+        attachments: [{ path: imagePath }],
+      },
+    ],
+    stream: false,
+  });
+  const final = await result.final;
+  const text = final.contentText.trim() || final.raw.fullText.trim();
+  return parseExtraction(text);
 }
 
 export async function transcribeObservation(uri: string): Promise<string> {
@@ -103,6 +163,9 @@ export async function shutdownQVAC(): Promise<void> {
     await unloadModel({ modelId: extractionModelId, clearStorage: false });
   if (transcriptionModelId)
     await unloadModel({ modelId: transcriptionModelId, clearStorage: false });
+  if (visionModelId)
+    await unloadModel({ modelId: visionModelId, clearStorage: false });
   extractionModelId = null;
   transcriptionModelId = null;
+  visionModelId = null;
 }

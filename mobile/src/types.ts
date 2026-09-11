@@ -26,6 +26,6 @@ export type LocalObservation = {
   audioUri: string | null;
   photoUri: string | null;
   extraction: Extraction;
-  syncState: "Local" | "Pendiente de enviar";
+  syncState: "Local" | "Pendiente de enviar" | "Sincronizado";
   createdAt: string;
 };

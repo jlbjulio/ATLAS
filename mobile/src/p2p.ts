@@ -1,6 +1,6 @@
 import { File } from "expo-file-system";
 
-import type { Extraction } from "./types";
+import type { Extraction, LocalObservation } from "./types";
 
 const CONNECT_TIMEOUT_MS = 8_000;
 const REQUEST_TIMEOUT_MS = 45_000;
@@ -59,7 +59,7 @@ async function timedFetch(
       );
     }
     throw new Error(
-      `No se pudo conectar con ${url}. Verifica que el móvil y la laptop estén en la misma red Wi-Fi.`,
+      `No se pudo conectar con ${url}. Verifica que el celular y la laptop estén en la misma red Wi-Fi.`,
       { cause: error },
     );
   } finally {
@@ -84,7 +84,7 @@ async function providerFetch(
   options: RequestInit,
 ): Promise<Response> {
   if (Date.parse(provider.expiresAt) <= Date.now()) {
-    throw new Error("La sesión P2P expiró. Empareja el móvil de nuevo.");
+    throw new Error("La sesión P2P expiró. Empareja el celular de nuevo.");
   }
   const response = await timedFetch(`${provider.baseUrl}${path}`, {
     ...options,
@@ -96,7 +96,7 @@ async function providerFetch(
   if (!response.ok) {
     throw new Error(
       response.status === 401
-        ? "La sesión P2P fue rechazada. Empareja el móvil de nuevo."
+        ? "La sesión P2P fue rechazada. Empareja el celular de nuevo."
         : "El proveedor P2P no pudo completar la inferencia.",
     );
   }
@@ -204,4 +204,27 @@ export async function delegateTranscription(
   });
   const payload = (await response.json()) as { text: string };
   return payload.text;
+}
+
+export async function syncObservations(
+  provider: P2PProvider,
+  observations: LocalObservation[],
+): Promise<{ synced: number; errors: string[] }> {
+  const payload = observations.map((obs) => ({
+    id: obs.id,
+    client: obs.client,
+    city: obs.city,
+    country: obs.country,
+    raw_text: obs.rawText,
+    audio_uri: obs.audioUri,
+    photo_uri: obs.photoUri,
+    extraction: obs.extraction,
+    created_at: obs.createdAt,
+  }));
+  const response = await providerFetch(provider, "/api/p2p/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ observations: payload }),
+  });
+  return response.json() as Promise<{ synced: number; errors: string[] }>;
 }
