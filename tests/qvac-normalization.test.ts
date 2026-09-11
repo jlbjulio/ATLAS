@@ -54,15 +54,110 @@ describe("inventory-query normalization", () => {
 
     expect(result).toEqual({
       customer: null,
-      country: "Panamá",
+      country: "Panama",
       city: null,
       modality: "CT",
       brand: null,
       minimum_age_years: 7,
       maximum_age_years: null,
+      maximum_confidence: null,
+      installation_year_min: null,
       status: null,
+      exclude_confirmed: false,
       stale_only: false,
       limit: 100,
     });
+  });
+
+  it("returns clean filters for a count question even when the model invents data", () => {
+    const result = normalizeInventoryFilters(
+      {
+        modality: "cuantos equipos",
+        brand: "hoy",
+        minimum_age_years: 18,
+        stale_only: true,
+        limit: 10,
+      },
+      "cuantos equipos hay?",
+    );
+
+    expect(result).toMatchObject({
+      country: null,
+      modality: null,
+      brand: null,
+      minimum_age_years: null,
+      maximum_age_years: null,
+      exclude_confirmed: false,
+      stale_only: false,
+      limit: 100,
+    });
+  });
+
+  it("maps renewal questions to the seven-year threshold without invented brands", () => {
+    const result = normalizeInventoryFilters(
+      {
+        country: "Colombia",
+        modality: "Oportunidades de renovación en Colombia",
+        brand: "Colombia",
+        minimum_age_years: 18,
+      },
+      "Oportunidades de renovación en Colombia",
+    );
+
+    expect(result).toMatchObject({
+      country: "Colombia",
+      modality: null,
+      brand: null,
+      minimum_age_years: 7,
+    });
+  });
+
+  it("normalizes country aliases and modality synonyms from the question", () => {
+    const result = normalizeInventoryFilters(
+      { country: "Brasil", modality: "resonadores", minimum_age_years: 5 },
+      "Clientes en Brasil con resonadores de más de siete años",
+    );
+
+    expect(result).toMatchObject({
+      country: "Brazil",
+      modality: "MR",
+      minimum_age_years: 7,
+    });
+  });
+
+  it("extracts confidence, installation year and unconfirmed filters", () => {
+    expect(
+      normalizeInventoryFilters(
+        { maximum_confidence: 0.3 },
+        "Equipos con confianza menor al 70%",
+      ).maximum_confidence,
+    ).toBe(0.7);
+
+    expect(
+      normalizeInventoryFilters(
+        {},
+        "Resonadores instalados después de 2020",
+      ),
+    ).toMatchObject({ modality: "MR", installation_year_min: 2021 });
+
+    expect(
+      normalizeInventoryFilters(
+        { status: "Reportado" },
+        "Equipos reportados sin confirmar",
+      ),
+    ).toMatchObject({ status: null, exclude_confirmed: true });
+  });
+
+  it("keeps known brands and rejects unknown ones", () => {
+    expect(
+      normalizeInventoryFilters(
+        { brand: "Philips" },
+        "Tomógrafos NovaMed con más de 10 años",
+      ),
+    ).toMatchObject({ modality: "CT", brand: "NovaMed", minimum_age_years: 10 });
+
+    expect(
+      normalizeInventoryFilters({ brand: "Philips" }, "Tomógrafos con más de 10 años"),
+    ).toMatchObject({ brand: null });
   });
 });

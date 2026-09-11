@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { useSearchParams } from "react-router-dom"
 import {
   Database,
@@ -23,20 +23,25 @@ import {
   PageHeader,
 } from "@/components/common"
 import { SearchForm } from "@/components/forms"
-import { LoadingMessages } from "@/components/common/LoadingMessages"
+import {
+  AnswerTyping,
+  QueryProgress,
+} from "@/components/shared/QueryProgress"
+import { QuerySkeleton } from "@/components/shared/QuerySkeleton"
+import { Typewriter } from "@/components/shared/Typewriter"
 import { api } from "@/services/api"
 import { mapSearchResponse } from "@/lib/mappers"
 import type { ClientInstalledBase, QueryIntent } from "@/types"
 
 const exampleQueries = [
+  "¿Cuántos equipos hay?",
+  "Oportunidades de renovación",
   "Clientes en Brasil con resonadores de más de siete años",
-  "Tomógrafos Philips con más de 10 años de antigüedad",
-  "Oportunidades de renovación en Colombia",
+  "Tomógrafos con más de 10 años de antigüedad",
   "Equipos reportados sin confirmar",
-  "Base instalada por país",
-  "Duplicados detectados esta semana",
   "Equipos con confianza menor al 70%",
-  "Resonadores Siemens instalados después de 2020",
+  "Resonadores instalados después de 2020",
+  "Oportunidades de renovación en Panama",
 ]
 
 const QUICK_STATS = [
@@ -60,6 +65,7 @@ const STAT_COLOR_MAP: Record<string, { bg: string; text: string }> = {
 export function QueriesPage() {
   const [searchParams] = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
+  const [isAnswering, setIsAnswering] = useState(false)
   const [showExamples, setShowExamples] = useState(false)
   const [queryError, setQueryError] = useState<string | null>(null)
   const [currentQuery, setCurrentQuery] = useState<{
@@ -99,66 +105,65 @@ export function QueriesPage() {
     loadStats()
   }, [])
 
-  const handleSearch = async (query: string) => {
-    setIsLoading(true)
-    setCurrentQuery(null)
-    setQueryError(null)
-
-    try {
-      const response = await api.search(query)
-      const { results, filters, intent, naturalResponse } = mapSearchResponse(response)
-      setCurrentQuery({
-        query,
-        parsedIntent: (intent as QueryIntent) ?? "UNKNOWN",
-        results,
-        filters,
-        naturalResponse,
-      })
-    } catch (err) {
-      console.error("Search error:", err)
-      setQueryError(
-        "ATLAS no pudo responder esta pregunta. Revisa que el backend local y QVAC estén disponibles."
-      )
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    const initial = searchParams.get("q")
-    if (!initial) return
-    let active = true
-    const run = async () => {
+  const runSearch = useCallback(
+    async (query: string, isActive: () => boolean = () => true) => {
       setIsLoading(true)
+      setIsAnswering(false)
       setCurrentQuery(null)
       setQueryError(null)
+
       try {
-        const response = await api.search(initial)
-        const { results, filters, intent, naturalResponse } = mapSearchResponse(response)
-        if (!active) return
+        const response = await api.search(query)
+        if (!isActive()) return
+        const { results, filters, intent, naturalResponse, answerSummary } =
+          mapSearchResponse(response)
         setCurrentQuery({
-          query: initial,
+          query,
           parsedIntent: (intent as QueryIntent) ?? "UNKNOWN",
           results,
           filters,
           naturalResponse,
         })
+        setIsLoading(false)
+        setIsAnswering(true)
+        try {
+          const answer = await api.searchAnswer(query, answerSummary)
+          if (isActive() && answer.natural_response) {
+            setCurrentQuery((previous) =>
+              previous && previous.query === query
+                ? { ...previous, naturalResponse: answer.natural_response }
+                : previous
+            )
+          }
+        } catch (answerError) {
+          console.error("Answer error:", answerError)
+        } finally {
+          if (isActive()) setIsAnswering(false)
+        }
       } catch (err) {
         console.error("Search error:", err)
-        if (active) {
+        if (isActive()) {
           setQueryError(
             "ATLAS no pudo responder esta pregunta. Revisa que el backend local y QVAC estén disponibles."
           )
+          setIsLoading(false)
         }
-      } finally {
-        if (active) setIsLoading(false)
       }
-    }
-    run()
+    },
+    []
+  )
+
+  const handleSearch = (query: string) => runSearch(query)
+
+  useEffect(() => {
+    const initial = searchParams.get("q")
+    if (!initial) return
+    let active = true
+    void runSearch(initial, () => active)
     return () => {
       active = false
     }
-  }, [searchParams])
+  }, [searchParams, runSearch])
 
   const handleExport = () => {
     if (!currentQuery) return
@@ -234,20 +239,9 @@ export function QueriesPage() {
           )}
 
           {isLoading && (
-            <div
-              className="flex items-center gap-3 text-sm text-muted-foreground"
-              role="status"
-            >
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <MessageCircle className="h-5 w-5 animate-pulse" />
-              </div>
-              <LoadingMessages
-                messages={[
-                  "ATLAS está interpretando tu pregunta...",
-                  "Buscando en la base instalada local...",
-                  "Preparando una respuesta natural...",
-                ]}
-              />
+            <div className="space-y-3">
+              <QueryProgress stage="searching" />
+              <QuerySkeleton />
             </div>
           )}
 
@@ -294,9 +288,15 @@ export function QueriesPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle>Respuesta de ATLAS</CardTitle>
-                        <CardDescription>
-                          {currentQuery.naturalResponse}
-                        </CardDescription>
+                        <div className="mt-1">
+                          {isAnswering ? (
+                            <AnswerTyping />
+                          ) : (
+                            <p className="animate-fade-in text-sm leading-6 text-foreground">
+                              <Typewriter text={currentQuery.naturalResponse} />
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button

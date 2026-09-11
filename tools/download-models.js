@@ -9,6 +9,7 @@ import {
   downloadAsset,
   EMBEDDINGGEMMA_300M_Q8_0,
   MMPROJ_VISIONPSY_NANO_460M_MULTIMODAL_Q8_0,
+  QWEN3_1_7B_INST_Q4,
   QWEN3_600M_INST_Q4,
   VAD_SILERO_5_1_2,
   VISIONPSY_NANO_460M_MULTIMODAL_Q4_K_M,
@@ -32,6 +33,11 @@ const assets = [
   [VAD_SILERO_5_1_2, "models/speech/silero-vad-5.1.2.bin"],
   [EMBEDDINGGEMMA_300M_Q8_0, "models/embeddings/embeddinggemma-300m-q8_0.gguf"],
 ];
+
+// Optional: ATLAS_DOWNLOAD_QUERY_1_7B=1 downloads the larger query/answer model.
+if (process.env.ATLAS_DOWNLOAD_QUERY_1_7B === "1") {
+  assets.push([QWEN3_1_7B_INST_Q4, "models/language/qwen3-1.7b-q4_0.gguf"]);
+}
 
 async function sha256(path) {
   const hash = createHash("sha256");

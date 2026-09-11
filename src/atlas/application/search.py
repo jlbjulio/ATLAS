@@ -18,7 +18,10 @@ class InventoryFilters(BaseModel):
     brand: str | None = None
     minimum_age_years: float | None = Field(default=None, ge=0)
     maximum_age_years: float | None = Field(default=None, ge=0)
+    maximum_confidence: float | None = Field(default=None, ge=0, le=1)
+    installation_year_min: int | None = Field(default=None, ge=1900, le=2200)
     status: str | None = None
+    exclude_confirmed: bool = False
     stale_only: bool = False
     limit: int = Field(default=100, ge=1, le=500)
 
@@ -47,6 +50,14 @@ def compile_filters(filters: InventoryFilters) -> tuple[str, list[object]]:
     if filters.maximum_age_years is not None:
         clauses.append("a.age_years <= ?")
         values.append(filters.maximum_age_years)
+    if filters.maximum_confidence is not None:
+        clauses.append("a.confidence <= ?")
+        values.append(filters.maximum_confidence)
+    if filters.installation_year_min is not None:
+        clauses.append("a.installation_year >= ?")
+        values.append(filters.installation_year_min)
+    if filters.exclude_confirmed:
+        clauses.append("a.status != 'Confirmado'")
     if filters.stale_only:
         clauses.append("date(a.last_seen) < date('now', '-365 day')")
 

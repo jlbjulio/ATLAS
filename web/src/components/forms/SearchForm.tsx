@@ -18,12 +18,12 @@ interface SearchFormProps {
 }
 
 const DEFAULT_SUGGESTIONS = [
+  "¿Cuántos equipos hay?",
+  "Oportunidades de renovación",
   "Clientes en Brasil con resonadores de más de siete años",
-  "Tomógrafos Philips con más de 10 años",
-  "Oportunidades de renovación en Colombia",
+  "Tomógrafos con más de 10 años de antigüedad",
   "Equipos reportados sin confirmar",
-  "Base instalada por país",
-  "Duplicados detectados esta semana",
+  "Equipos con confianza menor al 70%",
 ]
 
 export function SearchForm({
@@ -104,13 +104,14 @@ export function SearchForm({
             )}
           </div>
 
-          {showSuggestions && query && filteredSuggestions.length > 0 && (
+          {showSuggestions && filteredSuggestions.length > 0 && (
             <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-border bg-popover shadow-xl scrollbar-thin">
               <ul className="py-1">
                 {filteredSuggestions.map((suggestion) => (
                   <li key={suggestion}>
                     <button
                       type="button"
+                      onMouseDown={(event) => event.preventDefault()}
                       onClick={() => handleSuggestionClick(suggestion)}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
                     >

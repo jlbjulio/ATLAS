@@ -28,7 +28,12 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import { listObservations, saveObservation, updateObservationSyncState } from "./src/db";
+import {
+  listObservations,
+  saveObservation,
+  updateObservationCountry,
+  updateObservationSyncState,
+} from "./src/db";
 import {
   extractObservation,
   extractObservationFromPhoto,
@@ -95,7 +100,7 @@ function FieldApp() {
   const [observations, setObservations] = useState<LocalObservation[]>([]);
   const [client, setClient] = useState("");
   const [city, setCity] = useState("");
-  const [country, setCountry] = useState("");
+  const [country, setCountry] = useState("Panama");
   const [note, setNote] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [audioUri, setAudioUri] = useState<string | null>(null);
@@ -116,6 +121,8 @@ function FieldApp() {
   const [manualMode, setManualMode] = useState(false);
   const [extractionMode, setExtractionMode] = useState<"local" | "p2p">("local");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncPromptOpen, setSyncPromptOpen] = useState(false);
+  const [syncCountry, setSyncCountry] = useState("Panama");
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
@@ -288,6 +295,56 @@ function FieldApp() {
     }
   }
 
+  function handleClearForm() {
+    setClient("");
+    setCity("");
+    setCountry("Panama");
+    setNote("");
+    setAudioUri(null);
+    setPhotoUri(null);
+    setExtraction(null);
+  }
+
+  async function runSync(batch: LocalObservation[]) {
+    if (!provider) return;
+    setIsSyncing(true);
+    try {
+      const result = await syncObservations(provider, batch);
+      const syncedIds = result.results
+        .filter((item) => item.ok)
+        .map((item) => item.id);
+      for (const id of syncedIds) {
+        await updateObservationSyncState(id, "Sincronizado");
+      }
+      const updated = await listObservations();
+      setObservations(updated);
+
+      const failed = result.results.filter((item) => !item.ok);
+      if (failed.length === 0) {
+        Alert.alert(
+          "Sincronización",
+          `${syncedIds.length} observaciones sincronizadas con la laptop.`,
+        );
+      } else {
+        const reasons = failed
+          .map((item) => item.error || "Error desconocido")
+          .slice(0, 3)
+          .join("\n");
+        Alert.alert(
+          "Sincronización parcial",
+          `${syncedIds.length} sincronizadas. ${failed.length} con error:\n${reasons}`,
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        "No se pudo sincronizar",
+        error instanceof Error ? error.message : "Error de red P2P",
+      );
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
   async function handleSync() {
     if (!provider) {
       Alert.alert("Laptop no conectada", "Empareja una laptop primero para sincronizar.");
@@ -298,29 +355,29 @@ function FieldApp() {
       Alert.alert("Nada para sincronizar", "Todas las observaciones ya están en la laptop.");
       return;
     }
-    setIsSyncing(true);
-    try {
-      const result = await syncObservations(provider, unsynced);
-      if (result.synced > 0) {
-        for (const obs of unsynced.slice(0, result.synced)) {
-          await updateObservationSyncState(obs.id, "Sincronizado");
-        }
-        const updated = await listObservations();
-        setObservations(updated);
-      }
-      const message =
-        result.errors.length > 0
-          ? `${result.synced} sincronizadas. ${result.errors.length} con error.`
-          : `${result.synced} observaciones sincronizadas con la laptop.`;
-      Alert.alert("Sincronización", message);
-    } catch (error) {
-      Alert.alert(
-        "No se pudo sincronizar",
-        error instanceof Error ? error.message : "Error de red P2P",
-      );
-    } finally {
-      setIsSyncing(false);
+    const missingCountry = unsynced.filter((item) => !item.country?.trim());
+    if (missingCountry.length > 0) {
+      setSyncCountry(country.trim() || "Panama");
+      setSyncPromptOpen(true);
+      return;
     }
+    await runSync(unsynced);
+  }
+
+  async function confirmSyncCountry() {
+    if (!provider) return;
+    const target = syncCountry.trim() || "Panama";
+    const unsynced = observations.filter((o) => o.syncState !== "Sincronizado");
+    const missing = unsynced.filter((item) => !item.country?.trim());
+    setSyncPromptOpen(false);
+    for (const item of missing) {
+      await updateObservationCountry(item.id, target);
+    }
+    const updated = await listObservations();
+    setObservations(updated);
+    await runSync(
+      updated.filter((item) => item.syncState !== "Sincronizado"),
+    );
   }
 
   async function handlePair() {
@@ -390,10 +447,10 @@ function FieldApp() {
   }
 
   async function handleSave() {
-    if (!extraction || !client.trim() || !city.trim()) {
+    if (!extraction || !client.trim() || !city.trim() || !country.trim()) {
       Alert.alert(
         "Falta información",
-        "Indica cliente, ciudad y realiza la extracción antes de guardar.",
+        "Indica cliente, ciudad, país y realiza la extracción antes de guardar.",
       );
       return;
     }
@@ -415,7 +472,7 @@ function FieldApp() {
       setObservations((current) => [observation, ...current]);
       setClient("");
       setCity("");
-      setCountry("");
+      setCountry("Panama");
       setNote("");
       setAudioUri(null);
       setPhotoUri(null);
@@ -536,9 +593,18 @@ function FieldApp() {
             </View>
 
             <View style={styles.voiceHintCard}>
-              <Text style={styles.voiceHintTitle}>
-                Dicta el formulario completo
-              </Text>
+              <View style={styles.voiceHintHeader}>
+                <Text style={styles.voiceHintTitle}>
+                  Dicta el formulario completo
+                </Text>
+                <Pressable
+                  onPress={handleClearForm}
+                  accessibilityLabel="Limpiar formulario"
+                  style={styles.clearButton}
+                >
+                  <Text style={styles.clearButtonText}>Limpiar</Text>
+                </Pressable>
+              </View>
               <Text style={styles.voiceHintText}>
                 Di: Cliente Hospital San Juan, Ciudad Panamá, País Panamá,
                 Observación (o Evidencia) vi un tomógrafo Philips de 8 años…
@@ -958,6 +1024,60 @@ function FieldApp() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal
+        visible={syncPromptOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setSyncPromptOpen(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View
+            style={[
+              styles.pairingSheet,
+              { paddingBottom: Math.max(insets.bottom, 12) + 16 },
+            ]}
+          >
+            <Text style={styles.pairingTitle}>
+              País para observaciones sin país
+            </Text>
+            <Text style={styles.pairingText}>
+              Hay observaciones guardadas antes del campo País. Indica qué país
+              les corresponde antes de sincronizar.
+            </Text>
+            <TextInput
+              value={syncCountry}
+              onChangeText={setSyncCountry}
+              placeholder="País"
+              placeholderTextColor={COLORS.muted}
+              style={styles.input}
+            />
+            <Pressable
+              disabled={isSyncing || !syncCountry.trim()}
+              onPress={confirmSyncCountry}
+              style={[
+                styles.modalConnect,
+                (!syncCountry.trim() || isSyncing) && styles.disabledButton,
+              ]}
+            >
+              {isSyncing ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.modalConnectText}>Aplicar y sincronizar</Text>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={() => setSyncPromptOpen(false)}
+              style={styles.modalCancel}
+            >
+              <Text style={styles.modalCancelText}>Cancelar</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -1215,9 +1335,27 @@ const styles = StyleSheet.create({
     padding: 14,
     marginTop: 16,
   },
+  voiceHintHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   voiceHintTitle: {
     color: COLORS.ink,
     fontSize: 13,
+    fontWeight: "700",
+    flex: 1,
+  },
+  clearButton: {
+    backgroundColor: "rgba(0, 125, 128, 0.12)",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginLeft: 8,
+  },
+  clearButtonText: {
+    color: COLORS.teal,
+    fontSize: 12,
     fontWeight: "700",
   },
   voiceHintText: {

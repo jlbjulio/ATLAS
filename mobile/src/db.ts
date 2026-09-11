@@ -83,3 +83,15 @@ export async function updateObservationSyncState(
     id,
   );
 }
+
+export async function updateObservationCountry(
+  id: string,
+  country: string,
+): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    "UPDATE observations SET country = ? WHERE id = ?",
+    country,
+    id,
+  );
+}

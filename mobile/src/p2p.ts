@@ -206,10 +206,22 @@ export async function delegateTranscription(
   return payload.text;
 }
 
+export type P2PSyncResult = {
+  id: string;
+  ok: boolean;
+  error: string | null;
+};
+
+export type P2PSyncResponse = {
+  synced: number;
+  results: P2PSyncResult[];
+  errors: string[];
+};
+
 export async function syncObservations(
   provider: P2PProvider,
   observations: LocalObservation[],
-): Promise<{ synced: number; errors: string[] }> {
+): Promise<P2PSyncResponse> {
   const payload = observations.map((obs) => ({
     id: obs.id,
     client: obs.client,
@@ -226,5 +238,5 @@ export async function syncObservations(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ observations: payload }),
   });
-  return response.json() as Promise<{ synced: number; errors: string[] }>;
+  return response.json() as Promise<P2PSyncResponse>;
 }

@@ -65,6 +65,61 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * The local model can hit the generation cap mid-string and leave the JSON
+ * open. Salvage the longest complete object, or close the truncated content.
+ */
+function repairTruncatedJson(input: string): unknown | null {
+  const start = input.indexOf("{");
+  if (start < 0) return null;
+  let text = input.slice(start);
+
+  let inString = false;
+  let escape = false;
+  const stack: string[] = [];
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === "\\") {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === "{" || char === "[") {
+      stack.push(char);
+    } else if (char === "}" || char === "]") {
+      stack.pop();
+      if (stack.length === 0) {
+        try {
+          return JSON.parse(text.slice(0, index + 1));
+        } catch {
+          break;
+        }
+      }
+    }
+  }
+
+  if (inString) text += '"';
+  text = text.replace(/[,\s]+$/, "");
+  if (/:\s*$/.test(text)) text += " null";
+  for (let index = stack.length - 1; index >= 0; index -= 1) {
+    text += stack[index] === "{" ? "}" : "]";
+  }
+  text = text.replace(/,\s*([}\]])/g, "$1");
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 function baseMetric(
   model: string,
   quantization: string,
@@ -145,7 +200,7 @@ async function structuredCompletion(
       generationParams: {
         temp: 0,
         top_p: 0.9,
-        predict: 500,
+        predict: 1200,
         seed: 42,
         reasoning_budget: 0,
         remove_thinking_from_context: true,
@@ -167,12 +222,20 @@ async function structuredCompletion(
     metric.tokens_per_second = final.stats?.tokensPerSecond ?? 0;
     const output = final.contentText.trim() || final.raw.fullText.trim();
     if (!output) throw new Error("QVAC returned an empty structured response");
-    const parsed = normalizeObservation(
-      JSON.parse(output) as StructuredObservation,
-      {
-        hasImage: Boolean(imagePath),
-      },
-    );
+    let raw: unknown;
+    try {
+      raw = JSON.parse(output);
+    } catch {
+      raw = repairTruncatedJson(output);
+      if (!raw) {
+        throw new Error(
+          "El modelo local devolvió un JSON incompleto. Intenta con una nota más corta.",
+        );
+      }
+    }
+    const parsed = normalizeObservation(raw as StructuredObservation, {
+      hasImage: Boolean(imagePath),
+    });
     metric.success = true;
     return parsed;
   } catch (error) {

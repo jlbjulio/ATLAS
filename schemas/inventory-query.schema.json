@@ -12,7 +12,10 @@
     "brand",
     "minimum_age_years",
     "maximum_age_years",
+    "maximum_confidence",
+    "installation_year_min",
     "status",
+    "exclude_confirmed",
     "stale_only",
     "limit"
   ],
@@ -24,9 +27,20 @@
     "brand": { "type": ["string", "null"] },
     "minimum_age_years": { "type": ["number", "null"], "minimum": 0 },
     "maximum_age_years": { "type": ["number", "null"], "minimum": 0 },
+    "maximum_confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "installation_year_min": {
+      "type": ["integer", "null"],
+      "minimum": 1900,
+      "maximum": 2200
+    },
     "status": {
       "enum": ["Confirmado", "Reportado", "Estimado", "Desconocido", null]
     },
+    "exclude_confirmed": { "type": "boolean" },
     "stale_only": { "type": "boolean" },
     "limit": { "type": "integer", "minimum": 1, "maximum": 500 }
   }

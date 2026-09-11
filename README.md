@@ -51,6 +51,10 @@ VisionPsy es el núcleo de la captura visual: interpreta fotografías autorizada
 
 Las salidas de los modelos siempre se consideran candidatas. El usuario confirma los campos antes de incorporarlos a la base instalada.
 
+Las consultas en lenguaje natural y sus respuestas usan Qwen3 1.7B cuando `models/language/qwen3-1.7b-q4_0.gguf` está disponible; si no, usan Qwen3 0.6B. El modelo grande es opcional y se descarga con `ATLAS_DOWNLOAD_QUERY_1_7B=1 npm run models:download`. Para forzar uno u otro: `ATLAS_QUERY_MODEL=0.6b` o `ATLAS_QUERY_MODEL=1.7b`.
+
+El backend mantiene un worker local (`src/qvac/worker-server.ts`) que carga el modelo una sola vez y atiende consultas y respuestas naturales por stdio, sin recargarlo en cada petición. Si el worker no está disponible, cada operación cae al CLI de un solo uso.
+
 ## Privacidad y confianza
 
 - No se admiten fotografías de pacientes, expedientes, gafetes ni personas identificables.

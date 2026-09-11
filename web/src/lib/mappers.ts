@@ -18,6 +18,7 @@ import type {
   ClientInstalledBase,
   QVACExtractionResult,
 } from "@/types";
+import { createId } from "@/lib/id";
 
 export function mapHealth(response: HealthResponse) {
   const requiredModels = ["qwen3-0.6b", "whisper-small", "silero-vad"];
@@ -229,12 +230,14 @@ export function mapSearchResponse(response: SearchResponse): {
   filters: Record<string, unknown>;
   intent: string;
   naturalResponse: string;
+  answerSummary: Record<string, unknown>;
 } {
   return {
     results: mapSearchResults(response.results),
     filters: response.filters_applied,
     intent: response.intent,
     naturalResponse: response.natural_response,
+    answerSummary: response.answer_summary ?? {},
   };
 }
 
@@ -257,7 +260,7 @@ export function toCoreDraft(
     country: formData.country ?? null,
     raw_text: formData.rawText,
     equipment: extraction.equipments.map((eq) => ({
-      id: crypto.randomUUID(),
+      id: createId(),
       modality: eq.modality,
       quantity: eq.quantity,
       brand: eq.brand ?? null,

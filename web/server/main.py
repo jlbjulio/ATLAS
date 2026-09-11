@@ -6,8 +6,10 @@ import json
 import logging
 import os
 import random
+import re
 import sys
 import tempfile
+import unicodedata
 from collections import Counter
 from pathlib import Path
 from typing import Annotated
@@ -127,6 +129,16 @@ class SearchResponse(BaseModel):
     filters_applied: dict
     intent: str
     natural_response: str
+    answer_summary: dict
+
+
+class SearchAnswerRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2_000)
+    summary: dict
+
+
+class SearchAnswerResponse(BaseModel):
+    natural_response: str
 
 
 class DashboardStatsResponse(BaseModel):
@@ -146,8 +158,15 @@ def _build_natural_response(
     results: list[dict],
     filters: InventoryFilters,
 ) -> str:
-    total_equipment = sum(len(client.get("equipments", [])) for client in results)
-    unique_clients = len(results)
+    # The repository returns flat asset rows; the web client groups them.
+    total_equipment = len(results)
+    unique_clients = len(
+        {
+            row.get("customer_name") or row.get("customer_id")
+            for row in results
+            if row.get("customer_name") or row.get("customer_id")
+        }
+    )
 
     modality = filters.modality
     brand = filters.brand
@@ -156,12 +175,13 @@ def _build_natural_response(
     customer = filters.customer
     min_age = filters.minimum_age_years
     stale_only = filters.stale_only
+    asks_count = bool(re.search(r"\bcu[aá]nt", question, re.IGNORECASE))
 
     if total_equipment == 0:
         suggestions = [
-            "prueba con otra modalidad como MRI o CT",
-            "pregunta por otro país o ciudad",
-            "consulta por una marca diferente",
+            "Prueba con otra modalidad como MRI o CT",
+            "Pregunta por otro país o ciudad",
+            "Consulta por una marca diferente",
         ]
         return (
             f"No encontré equipos que coincidan con tu consulta. "
@@ -169,10 +189,25 @@ def _build_natural_response(
         )
 
     parts: list[str] = []
-    if intent == "RENEWAL_OPPORTUNITIES":
+    if asks_count:
         parts.append(
-            f"Detecté {total_equipment} equipos con más de 7 años en {unique_clients} clientes. "
-            f"Son candidatos a revisión de renovación."
+            f"Hay {total_equipment} equipos registrados en {unique_clients} clientes."
+        )
+    elif intent == "RENEWAL_OPPORTUNITIES":
+        age_label = int(min_age) if min_age is not None else 7
+        parts.append(
+            f"Detecté {total_equipment} equipos con más de {age_label} años "
+            f"en {unique_clients} clientes. Son candidatos a revisión de renovación."
+        )
+    elif intent == "CONFIDENCE_LOW":
+        confidence_pct = round((filters.maximum_confidence or 0) * 100)
+        parts.append(
+            f"Encontré {total_equipment} equipos con confianza menor al "
+            f"{confidence_pct}% en {unique_clients} clientes."
+        )
+    elif intent == "PENDING":
+        parts.append(
+            f"Hay {total_equipment} equipos sin confirmar en {unique_clients} clientes."
         )
     elif intent == "LIST_EQUIPMENT_BY_AGE":
         parts.append(
@@ -212,13 +247,199 @@ def _build_natural_response(
         details.append(f"país {country}")
     if min_age is not None:
         details.append(f"antigüedad mayor a {min_age} años")
+    if filters.maximum_age_years is not None:
+        details.append(f"antigüedad menor a {filters.maximum_age_years} años")
+    if filters.maximum_confidence is not None:
+        details.append(
+            f"confianza menor al {round(filters.maximum_confidence * 100)}%"
+        )
+    if filters.installation_year_min is not None:
+        details.append(f"instalados desde {filters.installation_year_min}")
+    if filters.exclude_confirmed:
+        details.append("sin confirmar")
     if stale_only:
-        details.append("más de 7 años")
+        details.append("sin verificar recientemente")
 
     if details:
         parts[-1] += f" Filtré por: {', '.join(details)}."
 
     return " ".join(parts)
+
+
+_REFERENCE_VALUES_PATH = PROJECT_ROOT / "config" / "reference-values.json"
+
+_COUNTRY_ALIASES = {
+    "panama": "Panama",
+    "colombia": "Colombia",
+    "brasil": "Brazil",
+    "brazil": "Brazil",
+    "mexico": "Mexico",
+    "peru": "Peru",
+    "chile": "Chile",
+    "argentina": "Argentina",
+    "ecuador": "Ecuador",
+    "costa rica": "Costa Rica",
+    "republica dominicana": "Dominican Republic",
+    "dominican republic": "Dominican Republic",
+}
+
+_SPANISH_NUMBERS = {
+    "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4, "cinco": 5,
+    "seis": 6, "siete": 7, "ocho": 8, "nueve": 9, "diez": 10,
+    "once": 11, "doce": 12, "quince": 15, "veinte": 20, "treinta": 30,
+}
+
+
+def _plain(text: str) -> str:
+    decomposed = unicodedata.normalize("NFD", text)
+    return "".join(
+        char for char in decomposed if unicodedata.category(char) != "Mn"
+    ).lower()
+
+
+def _reference_values(kind: str) -> list[str]:
+    try:
+        config = json.loads(_REFERENCE_VALUES_PATH.read_text(encoding="utf-8"))
+        return [item["value"] for item in config["values"].get(kind, [])]
+    except (OSError, KeyError, json.JSONDecodeError):
+        return []
+
+
+def _fallback_filters(question: str) -> InventoryFilters:
+    """Deterministic filters so a model failure never leaves the demo empty."""
+    key = _plain(question)
+
+    modality = None
+    if re.search(r"\b(mr|mri|resonancia|resonador|resonadores)", key):
+        modality = "MR"
+    elif re.search(r"\b(ct|tomograf|tomografo|tomografos)", key):
+        modality = "CT"
+    elif re.search(r"\b(ultrasound|ultrasonido|ecograf|ecografo)", key):
+        modality = "Ultrasound"
+
+    country = next(
+        (
+            value
+            for alias, value in _COUNTRY_ALIASES.items()
+            if re.search(rf"\b{alias}\b", key)
+        ),
+        None,
+    )
+    brand = next(
+        (item for item in _reference_values("brand") if _plain(item) in key),
+        None,
+    )
+
+    minimum_age = None
+    age_match = re.search(
+        r"(?:mas de|mayor\w* de|superior\w* a|mas viej\w* que)\s+([a-z0-9]+)\s*anos",
+        key,
+    )
+    if age_match:
+        token = age_match.group(1)
+        minimum_age = (
+            int(token)
+            if token.isdigit()
+            else _SPANISH_NUMBERS.get(token)
+        )
+    if minimum_age is None and re.search(r"renovaci|reemplaz|oportunidad", key):
+        minimum_age = 7
+
+    exclude_confirmed = bool(
+        re.search(r"sin confirmar|no confirmad|pendient|por confirmar", key)
+    )
+    maximum_confidence = None
+    confidence_match = re.search(
+        r"confianza\s+(?:menor|inferior|bajo|baja|menos)(?:\s+(?:al?|de))?\s*(\d{1,3})\s*%?",
+        key,
+    )
+    if confidence_match:
+        percent = int(confidence_match.group(1))
+        if 0 < percent <= 100:
+            maximum_confidence = percent / 100
+
+    installation_year_min = None
+    year_match = re.search(
+        r"instalad\w*\s+(?:despues|posterior\w*)\s+(?:a|al|de)\s+(\d{4})",
+        key,
+    )
+    if year_match:
+        installation_year_min = int(year_match.group(1)) + 1
+
+    status = None
+    if not exclude_confirmed:
+        for pattern, value in (
+            ("confirmad", "Confirmado"),
+            ("reportad", "Reportado"),
+            ("estimad", "Estimado"),
+            ("desconocid", "Desconocido"),
+        ):
+            if re.search(rf"\b{pattern}", key):
+                status = value
+                break
+
+    return InventoryFilters(
+        modality=modality,
+        country=country,
+        brand=brand,
+        minimum_age_years=minimum_age,
+        maximum_confidence=maximum_confidence,
+        installation_year_min=installation_year_min,
+        status=status,
+        exclude_confirmed=exclude_confirmed,
+        limit=100,
+    )
+
+
+def _build_answer_summary(
+    results: list[dict], filters: InventoryFilters
+) -> dict[str, object]:
+    clients = {
+        row.get("customer_name") for row in results if row.get("customer_name")
+    }
+    active_filters = {
+        key: value
+        for key, value in filters.model_dump().items()
+        if key != "limit" and value not in (None, False)
+    }
+    sample = [
+        {
+            "cliente": row.get("customer_name"),
+            "ciudad": row.get("city"),
+            "pais": row.get("country"),
+            "modalidad": row.get("modality"),
+            "marca": row.get("brand"),
+            "modelo": row.get("model"),
+            "edad": row.get("age_years"),
+            "estado": row.get("status"),
+        }
+        for row in results[:6]
+    ]
+    return {
+        "total_equipos": len(results),
+        "total_clientes": len(clients),
+        "por_modalidad": dict(
+            Counter(str(row.get("modality") or "otra") for row in results)
+        ),
+        "por_estado": dict(
+            Counter(str(row.get("status") or "Desconocido") for row in results)
+        ),
+        "filtros_aplicados": active_filters,
+        "muestra": sample,
+    }
+
+
+def _fallback_answer_from_summary(summary: dict) -> str:
+    total = summary.get("total_equipos")
+    clients = summary.get("total_clientes")
+    if isinstance(total, int) and total == 0:
+        return (
+            "No encontré equipos con ese criterio; "
+            "prueba con otra modalidad, país o marca."
+        )
+    if isinstance(total, int) and isinstance(clients, int):
+        return f"Hay {total} equipos registrados en {clients} clientes."
+    return "Estos son los equipos que encontré en la base instalada."
 
 
 def get_model_files() -> dict[str, Path]:
@@ -228,6 +449,7 @@ def get_model_files() -> dict[str, Path]:
         "visionpsy-nano": PROJECT_ROOT / models["vision"]["path"],
         "visionpsy-mmproj": PROJECT_ROOT / models["vision"]["projector_path"],
         "qwen3-0.6b": PROJECT_ROOT / models["extraction"]["path"],
+        "qwen3-1.7b": PROJECT_ROOT / "models" / "language" / "qwen3-1.7b-q4_0.gguf",
         "whisper-small": PROJECT_ROOT / models["transcription"]["path"],
         "silero-vad": PROJECT_ROOT / models["transcription"]["vad_path"],
         "embeddinggemma-300m": PROJECT_ROOT / models["duplicates"]["path"],
@@ -546,7 +768,7 @@ async def extract_equipment(
         "country": request.country,
         "raw_text": request.text,
         "equipment": equipment,
-        "source": "text",
+        "source": "Text",
         "visit_date": str(__import__("datetime").date.today()),
         "observer": "web-user",
         "evidence": [],
@@ -671,18 +893,49 @@ async def p2p_transcribe(
             pass
 
 
+_MISSING_FIELD_LABELS = {
+    "client": "el cliente",
+    "city": "la ciudad",
+    "country": "el país",
+    "equipment": "los equipos",
+    "modality": "la modalidad",
+    "quantity": "la cantidad",
+    "brand": "la marca",
+    "model": "el modelo",
+    "age": "la antigüedad",
+    "serial_number": "el número de serie",
+}
+
+
+def _p2p_sync_error(error: Exception) -> str:
+    message = str(error)
+    missing = re.match(r"Required information is missing: (\w+)", message)
+    if missing:
+        field = missing.group(1)
+        return f"Falta {_MISSING_FIELD_LABELS.get(field, field)} en la observación."
+    if "needs customer, location, and equipment" in message:
+        return (
+            "La observación necesita cliente, ciudad, país y al menos un equipo."
+        )
+    return message or "No se pudo sincronizar la observación."
+
+
 @app.post("/api/p2p/sync")
 async def p2p_sync(
     request: P2PSyncRequest,
     _: Annotated[None, Depends(authorize_p2p)],
     service: Annotated[CaptureService, Depends(get_capture_service)],
 ) -> dict:
-    synced = 0
-    errors: list[str] = []
+    results: list[dict] = []
     for obs in request.observations:
         try:
             extraction = obs.extraction or {}
-            equipments = extraction.get("equipments", [])
+            equipments = extraction.get("equipments")
+            if not isinstance(equipments, list):
+                # Older mobile builds stored the singular "equipment" key.
+                equipments = extraction.get("equipment", [])
+            if not isinstance(equipments, list):
+                equipments = []
             evidence: list[Evidence] = []
             if obs.audio_uri:
                 evidence.append(Evidence(kind=EvidenceKind.AUDIO))
@@ -724,18 +977,16 @@ async def p2p_sync(
                 next_question=extraction.get("nextQuestion"),
             )
             service.confirm(draft, actor="ATLAS Field")
-            synced += 1
-        except Exception as e:
-            logger.exception("P2P sync observation failed")
-            errors.append(f"{obs.id}: {e}")
+            results.append({"id": obs.id, "ok": True, "error": None})
+        except Exception as error:
+            logger.warning("P2P sync observation failed: %s", error)
+            results.append(
+                {"id": obs.id, "ok": False, "error": _p2p_sync_error(error)}
+            )
 
-    if synced == 0 and errors:
-        raise HTTPException(
-            status_code=500,
-            detail=f"No se pudo sincronizar ninguna observación. {errors[0]}",
-        )
-
-    return {"synced": synced, "errors": errors}
+    synced = sum(1 for item in results if item["ok"])
+    errors = [f"{item['id']}: {item['error']}" for item in results if not item["ok"]]
+    return {"synced": synced, "results": results, "errors": errors}
 
 
 @app.post("/api/capture/confirm")
@@ -770,16 +1021,35 @@ async def search_inventory(
     try:
         extracted = runtime.run("query", text=request.question)
         filters = InventoryFilters.model_validate(extracted)
+    except Exception:
+        logger.exception(
+            "Local inventory search model failed; using deterministic filters"
+        )
+        filters = _fallback_filters(request.question)
+
+    try:
         sql, values = compile_filters(filters)
         results = repo.raw_query(sql, values)
     except Exception as error:
-        logger.exception("Local inventory search failed")
+        logger.exception("Local inventory search query failed")
         raise HTTPException(
             status_code=500,
             detail="La consulta local falló. Revisa el runtime QVAC.",
         ) from error
 
-    if filters.minimum_age_years is not None or filters.maximum_age_years is not None:
+    source = _plain(request.question)
+    asks_renewal = bool(re.search(r"renovaci|reemplaz|oportunidad", source))
+    if filters.maximum_confidence is not None:
+        intent = "CONFIDENCE_LOW"
+    elif filters.exclude_confirmed and filters.status is None:
+        intent = "PENDING"
+    elif asks_renewal and filters.minimum_age_years is not None:
+        intent = "RENEWAL_OPPORTUNITIES"
+    elif (
+        filters.minimum_age_years is not None
+        or filters.maximum_age_years is not None
+        or filters.installation_year_min is not None
+    ):
         intent = "LIST_EQUIPMENT_BY_AGE"
     elif filters.brand:
         intent = "LIST_EQUIPMENT_BY_BRAND"
@@ -798,13 +1068,38 @@ async def search_inventory(
         results,
         filters,
     )
+    summary = _build_answer_summary(results, filters)
 
     return SearchResponse(
         results=results,
         filters_applied=filters.model_dump(),
         intent=intent,
         natural_response=natural_response,
+        answer_summary=summary,
     )
+
+
+@app.post("/api/search/answer", response_model=SearchAnswerResponse)
+async def search_answer(
+    request: SearchAnswerRequest,
+    runtime: Annotated[QvacRuntime, Depends(get_qvac_runtime)],
+) -> SearchAnswerResponse:
+    try:
+        generated = runtime.run(
+            "answer",
+            question=request.question,
+            summary=json.dumps(request.summary, ensure_ascii=False),
+        )
+        text = str(generated.get("text", "")).strip()
+    except Exception:
+        logger.warning(
+            "Local natural answer failed; using deterministic response",
+            exc_info=True,
+        )
+        text = ""
+    if not text:
+        text = _fallback_answer_from_summary(request.summary)
+    return SearchAnswerResponse(natural_response=text)
 
 
 if __name__ == "__main__":

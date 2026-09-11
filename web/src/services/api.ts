@@ -16,6 +16,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
     } catch {
       error.data = await response.text();
     }
+    const detail = (error.data as { detail?: unknown } | undefined)?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      error.message = detail;
+    }
     throw error;
   }
   return response.json();
@@ -96,6 +100,13 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
+    }),
+
+  searchAnswer: (question: string, summary: Record<string, unknown>) =>
+    typedFetch<SearchAnswerResponse>(`${API_BASE}/search/answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, summary }),
     }),
 
   createP2PInvitation: (localUrl: string) =>
@@ -252,6 +263,11 @@ export type SearchResponse = {
   results: SearchResult[];
   filters_applied: Record<string, unknown>;
   intent: string;
+  natural_response: string;
+  answer_summary: Record<string, unknown>;
+};
+
+export type SearchAnswerResponse = {
   natural_response: string;
 };
 

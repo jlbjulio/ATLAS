@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Mic, Sparkles, X, Square, Info } from "lucide-react";
+import { AlertTriangle, Mic, Sparkles, X, Square, Info } from "lucide-react";
 import {
   Button,
   Textarea,
@@ -10,7 +10,8 @@ import {
   CardTitle,
   CardContent,
   NextBestQuestion,
-} from "@/components/common";
+} from "@/components/common"
+import { InlineProgress } from "@/components/common/TypingDots";
 import type {
   CaptureFormData,
   QVACExtractionResult,
@@ -75,6 +76,13 @@ const STATUS_OPTIONS = [
   { value: "ESTIMATED", label: "Estimado" },
   { value: "UNKNOWN", label: "Desconocido" },
 ];
+
+const FIELD_LABELS: Partial<Record<keyof CaptureFormData, string>> = {
+  clientName: "Cliente",
+  city: "Ciudad",
+  country: "País",
+  rawText: "Observación",
+};
 
 const CLIENT_KEYWORDS = "(?:cliente)"
 const FACILITY_KEYWORDS = "(?:hospital|clínica|clinica|centro)"
@@ -174,6 +182,10 @@ export function ObservationForm({
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [validationMessage, setValidationMessage] = useState<string | null>(
+    null,
+  );
+  const [extractError, setExtractError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [editableExtraction, setEditableExtraction] =
@@ -206,16 +218,29 @@ export function ObservationForm({
       newErrors.country = "El país es requerido";
     }
     setErrors(newErrors);
+    const missing = (
+      Object.keys(newErrors) as Array<keyof CaptureFormData>
+    ).map((field) => FIELD_LABELS[field] ?? field);
+    setValidationMessage(
+      missing.length > 0
+        ? `Faltan campos obligatorios: ${missing.join(", ")}.`
+        : null,
+    );
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setExtractError(null);
     if (!validateForm()) return;
 
-    if (editableExtraction) {
-      await onSubmit(formData, editableExtraction);
+    if (!editableExtraction) {
+      setValidationMessage(
+        "Primero analiza la observación con ATLAS para generar los registros.",
+      );
+      return;
     }
+    await onSubmit(formData, editableExtraction);
   };
 
   const handleExtract = async () => {
@@ -228,12 +253,18 @@ export function ObservationForm({
       return;
     }
 
+    setExtractError(null);
     setIsExtracting(true);
     try {
       const result = await onExtract(formData);
       return result;
     } catch (error) {
       console.error("Extraction failed:", error);
+      setExtractError(
+        error instanceof Error && error.message
+          ? error.message
+          : "La extracción local falló. Inténtalo de nuevo.",
+      );
     } finally {
       setIsExtracting(false);
     }
@@ -449,12 +480,18 @@ export function ObservationForm({
                 </Button>
               </div>
             </div>
-            <p
-              className={`mt-2 text-xs ${voiceError ? "text-danger-soft-foreground" : "text-muted-foreground"}`}
-              role={voiceError ? "alert" : "status"}
-            >
-              {voiceStatus}
-            </p>
+            <div className="mt-2">
+              {isTranscribing ? (
+                <InlineProgress label="Transcribiendo localmente..." />
+              ) : (
+                <p
+                  className={`text-xs ${voiceError ? "text-danger-soft-foreground" : "text-muted-foreground"}`}
+                  role={voiceError ? "alert" : "status"}
+                >
+                  {voiceStatus}
+                </p>
+              )}
+            </div>
             {errors.rawText && (
               <p className="mt-1 text-sm text-danger-soft-foreground" role="alert">
                 {errors.rawText}
@@ -462,7 +499,7 @@ export function ObservationForm({
             )}
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-3">
             <Button
               type="button"
               variant="primary"
@@ -474,6 +511,18 @@ export function ObservationForm({
               <Sparkles className="mr-2 h-4 w-4" />
               Analizar con ATLAS
             </Button>
+            {isExtracting && (
+              <InlineProgress label="ATLAS está analizando la evidencia..." />
+            )}
+            {extractError && !isExtracting && (
+              <div
+                className="flex w-full items-start gap-2 rounded-lg border border-danger-soft-foreground/25 bg-danger-soft px-4 py-3 text-sm text-danger-soft-foreground"
+                role="alert"
+              >
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{extractError}</span>
+              </div>
+            )}
           </div>
 
           <div>
@@ -643,6 +692,16 @@ export function ObservationForm({
                 followUpQuestions={editableExtraction.followUpQuestions}
                 className="mt-4"
               />
+            </div>
+          )}
+
+          {validationMessage && (
+            <div
+              className="flex items-center gap-2 rounded-lg border border-danger-soft-foreground/25 bg-danger-soft px-4 py-3 text-sm text-danger-soft-foreground"
+              role="alert"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>{validationMessage}</span>
             </div>
           )}
 

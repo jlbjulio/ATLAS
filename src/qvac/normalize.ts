@@ -20,7 +20,8 @@ export function normalizeObservation(
   if (!value.client) missing.add("client");
   if (!value.country) missing.add("country");
   if (!value.city) missing.add("city");
-  value.equipment.forEach((item, index) => {
+  const equipment = Array.isArray(value.equipment) ? value.equipment : [];
+  equipment.forEach((item, index) => {
     item.modality = canonicalModality(item.modality);
     if (!item.modality) missing.add(`equipment[${index}].modality`);
     if (!item.quantity) missing.add(`equipment[${index}].quantity`);
@@ -38,6 +39,7 @@ export function normalizeObservation(
   });
   return {
     ...value,
+    equipment,
     missing_fields: [...missing],
     next_question: missing.size ? value.next_question : null,
     privacy_flags: options.hasImage ? (value.privacy_flags ?? []) : [],

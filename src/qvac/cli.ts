@@ -9,6 +9,7 @@ import {
   inspectEquipmentPhoto,
   transcribeAudio,
 } from "./engine.js";
+import { answerInventoryQuestion } from "./answer.js";
 import { parseInventoryQuestion } from "./query.js";
 
 function option(name: string): string | undefined {
@@ -75,7 +76,14 @@ async function run(): Promise<void> {
     process.stdout.write(`${JSON.stringify(result)}\n`);
     return;
   }
-  throw new Error("Use health, extract, transcribe, embed, or query.");
+  if (command === "answer") {
+    const question = required("--question");
+    const summary = JSON.parse(required("--summary")) as Record<string, unknown>;
+    const text = await answerInventoryQuestion(question, summary);
+    process.stdout.write(`${JSON.stringify({ text })}\n`);
+    return;
+  }
+  throw new Error("Use health, extract, transcribe, embed, query, or answer.");
 }
 
 try {

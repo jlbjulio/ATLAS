@@ -18,7 +18,6 @@ import {
   Badge,
   Modal,
   StatusBadge,
-  Stepper,
   ConfidenceMeter,
   EvidenceOrigin,
 } from "@/components/common"
@@ -39,8 +38,6 @@ export function CapturePage() {
   const [formInstance, setFormInstance] = useState(0)
   const [lastFormData, setLastFormData] = useState<CaptureFormData | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-
-  const currentStep = showSuccess ? 2 : extractionResult ? 1 : 0
 
   const handleExtract = async (
     formData: CaptureFormData,
@@ -73,8 +70,12 @@ export function CapturePage() {
       setShowSuccess(true)
     } catch (error) {
       console.error("Error al guardar la observación:", error)
+      const detail =
+        error instanceof Error && error.message
+          ? ` (${error.message})`
+          : ""
       setActionError(
-        "No se pudo confirmar la observación. Revisa los datos e inténtalo de nuevo.",
+        `No se pudo confirmar la observación. Revisa los datos e inténtalo de nuevo.${detail}`,
       )
     } finally {
       setIsSubmitting(false)
@@ -160,11 +161,6 @@ export function CapturePage() {
           </p>
         </div>
       </div>
-
-      <Stepper
-        steps={["Observar", "Revisar y editar", "Confirmar"]}
-        current={currentStep}
-      />
 
       {actionError && (
         <div

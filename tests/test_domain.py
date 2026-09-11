@@ -7,8 +7,20 @@ from atlas.application.renewal import OpportunityKind, evaluate_opportunities
 from atlas.application.search import InventoryFilters, compile_filters
 from atlas.domain.confidence import calculate_confidence
 from atlas.domain.duplicates import assess_duplicate
-from atlas.domain.equipment import EquipmentCandidate, InstalledAsset, ObservationStatus
+from atlas.domain.equipment import (
+    CaptureSource,
+    EquipmentCandidate,
+    InstalledAsset,
+    ObservationStatus,
+)
 from atlas.domain.observations import ObservationDraft
+
+
+def test_observation_source_accepts_lowercase_aliases() -> None:
+    draft = ObservationDraft(source="text")
+    assert draft.source is CaptureSource.TEXT
+    assert ObservationDraft(source="Voice").source is CaptureSource.VOICE
+    assert ObservationDraft(source="photo").source is CaptureSource.PHOTO
 
 
 def test_follow_up_prioritizes_required_information() -> None:

@@ -42,6 +42,54 @@ def test_api_returns_seeded_inventory(tmp_path: Path) -> None:
         app.dependency_overrides.clear()
 
 
+def test_search_falls_back_to_deterministic_filters(
+    tmp_path: Path, monkeypatch
+) -> None:
+    class FailingRuntime:
+        def run(self, command: str, **options) -> dict:
+            raise RuntimeError("model unavailable")
+
+    database = SQLiteDatabase(tmp_path / "atlas.db")
+    database.initialize()
+    database.seed_from_csv()
+    app.dependency_overrides[get_database] = lambda: database
+    app.dependency_overrides[get_qvac_runtime] = lambda: FailingRuntime()
+    monkeypatch.setattr(api_server, "require_models", lambda *names: None)
+
+    try:
+        response = TestClient(app).post(
+            "/api/search",
+            json={"question": "Oportunidades de renovación en Colombia"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["intent"] == "RENEWAL_OPPORTUNITIES"
+        assert payload["filters_applied"]["country"] == "Colombia"
+        assert payload["filters_applied"]["minimum_age_years"] == 7
+        assert payload["filters_applied"]["brand"] is None
+        assert payload["natural_response"]
+
+        count = TestClient(app).post(
+            "/api/search", json={"question": "¿Cuántos equipos hay?"}
+        )
+        assert count.status_code == 200
+        assert count.json()["filters_applied"]["minimum_age_years"] is None
+        assert count.json()["answer_summary"]["total_equipos"] == 20
+
+        answer = TestClient(app).post(
+            "/api/search/answer",
+            json={
+                "question": "¿Cuántos equipos hay?",
+                "summary": count.json()["answer_summary"],
+            },
+        )
+        assert answer.status_code == 200
+        assert "equipos registrados" in answer.json()["natural_response"]
+        assert "13 clientes" in answer.json()["natural_response"]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_health_reports_configured_local_models() -> None:
     response = TestClient(app).get("/api/health")
 
@@ -70,6 +118,37 @@ def test_confirmation_rejects_sensitive_content() -> None:
 
     assert response.status_code == 400
     assert "sensitive visual content" in response.json()["detail"]
+
+
+def test_confirmation_accepts_extracted_draft(tmp_path: Path) -> None:
+    database = SQLiteDatabase(tmp_path / "atlas.db")
+    database.initialize()
+    database.seed_from_csv()
+    app.dependency_overrides[get_database] = lambda: database
+    try:
+        response = TestClient(app).post(
+            "/api/capture/confirm",
+            json={
+                "client": "Hospital DemoCare Pacific",
+                "city": "Panama City",
+                "country": "Panama",
+                "raw_text": "Vi un tomógrafo NovaMed de 8 años",
+                "source": "text",
+                "equipment": [
+                    {
+                        "modality": "CT",
+                        "quantity": 1,
+                        "brand": "NovaMed",
+                        "status": "Reportado",
+                        "confidence": 0.9,
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json()["asset_ids"]
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_p2p_pairing_rejects_invalid_code(monkeypatch) -> None:
@@ -346,3 +425,66 @@ def test_transcription_keeps_known_wav_suffix(tmp_path: Path) -> None:
     call = _transcribe_with_runtime(FakeRuntime(), "recording.wav", b"RIFF")
 
     assert Path(call["audio"]).suffix == ".wav"
+
+
+def test_p2p_sync_reports_per_observation_results(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("ATLAS_P2P_PAIRING_CODE", "12345678")
+    database = SQLiteDatabase(tmp_path / "atlas.db")
+    database.initialize()
+    database.seed_from_csv()
+    app.dependency_overrides[get_database] = lambda: database
+    try:
+        client = TestClient(app)
+        paired = client.post(
+            "/api/p2p/pair",
+            json={"code": "12345678", "device_name": "ATLAS Field"},
+        )
+        assert paired.status_code == 200
+        headers = {"X-ATLAS-P2P-Token": paired.json()["token"]}
+
+        valid = {
+            "id": "obs-1",
+            "client": "Hospital DemoCare Pacific",
+            "city": "Panama City",
+            "country": "Panama",
+            "raw_text": "Tomógrafo observado",
+            "extraction": {
+                "equipments": [
+                    {
+                        "modality": "CT",
+                        "quantity": 1,
+                        "status": "Reportado",
+                        "confidence": 0.9,
+                    }
+                ]
+            },
+            "created_at": "2026-09-11T00:00:00Z",
+        }
+        # Legacy mobile builds stored the singular "equipment" key and could
+        # miss the country field.
+        missing_country = {
+            **valid,
+            "id": "obs-2",
+            "country": "",
+            "extraction": {
+                "equipment": [{"modality": "MR", "quantity": 1}]
+            },
+        }
+
+        response = client.post(
+            "/api/p2p/sync",
+            headers=headers,
+            json={"observations": [valid, missing_country]},
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["synced"] == 1
+        results = {item["id"]: item for item in payload["results"]}
+        assert results["obs-1"]["ok"] is True
+        assert results["obs-2"]["ok"] is False
+        assert "país" in results["obs-2"]["error"]
+    finally:
+        app.dependency_overrides.clear()

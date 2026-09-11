@@ -67,6 +67,20 @@ class ObservationDraft(BaseModel):
     def clean_optional_text(cls, value: object) -> object:
         return normalize_text(value) if isinstance(value, str) else value
 
+    @field_validator("source", mode="before")
+    @classmethod
+    def normalize_source(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        aliases = {
+            "voice": CaptureSource.VOICE,
+            "text": CaptureSource.TEXT,
+            "photo": CaptureSource.PHOTO,
+            "multimodal": CaptureSource.MULTIMODAL,
+            "import": CaptureSource.IMPORT,
+        }
+        return aliases.get(value.strip().casefold(), value)
+
     @property
     def ready_for_review(self) -> bool:
         return bool(self.client and self.city and self.country and self.equipment)
