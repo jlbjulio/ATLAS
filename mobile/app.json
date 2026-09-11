@@ -4,7 +4,7 @@
     "slug": "atlas-field",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.webp",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -13,13 +13,17 @@
       "backgroundColor": "#0D1B24"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.atlas.field"
     },
     "android": {
       "package": "com.atlas.field",
       "permissions": [
         "RECORD_AUDIO",
-        "CAMERA"
+        "CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
