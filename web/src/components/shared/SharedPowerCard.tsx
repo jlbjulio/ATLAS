@@ -55,17 +55,17 @@ export function SharedPowerCard() {
 
   return (
     <>
-      <Card className="border-primary-200 bg-primary-50">
+      <Card className="border-border bg-primary/10">
         <CardContent className="p-5">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary-readable">
               <Smartphone className="h-6 w-6" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-primary-900">
+              <h3 className="font-semibold text-primary-readable">
                 Potencia compartida
               </h3>
-              <p className="text-sm text-primary-700">
+              <p className="text-sm text-primary-readable/80">
                 Enlaza el móvil con esta laptop para que ATLAS use el procesador
                 más potente automáticamente.
               </p>
@@ -80,12 +80,12 @@ export function SharedPowerCard() {
 
       <Modal isOpen={isOpen} onClose={close} title="Enlazar móvil" size="sm">
         <div className="space-y-4 text-center">
-          <p className="text-sm text-surface-600">
+          <p className="text-sm text-muted-foreground">
             Escanea este código desde ATLAS Field para enlazar los dispositivos.
           </p>
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div className="rounded-lg border border-danger-soft-foreground/25 bg-danger-soft p-3 text-sm text-danger-soft-foreground">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{error}</span>
@@ -95,16 +95,16 @@ export function SharedPowerCard() {
 
           {loading && (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary-readable" />
             </div>
           )}
 
           {inviteUrl && !loading && (
             <>
-              <div className="flex justify-center rounded-xl border border-surface-200 bg-white p-4">
+              <div className="flex justify-center rounded-xl border border-border bg-card p-4">
                 <QRCodeSVG value={inviteUrl} size={200} level="H" />
               </div>
-              <p className="text-xs text-surface-500">
+              <p className="text-xs text-muted-foreground">
                 El código expira en 5 minutos.
               </p>
             </>
