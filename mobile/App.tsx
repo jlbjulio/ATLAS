@@ -380,7 +380,7 @@ function FieldApp() {
   }
 
   if (showSplash) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+    return <SplashScreen duration={4500} onFinish={() => setShowSplash(false)} />;
   }
 
   return (
@@ -638,7 +638,12 @@ function FieldApp() {
       >
         <View style={styles.cameraScreen}>
           <CameraView ref={cameraRef} style={styles.camera} facing="back" />
-          <View style={styles.cameraControls}>
+          <View
+            style={[
+              styles.cameraControls,
+              { paddingBottom: Math.max(insets.bottom, 12) },
+            ]}
+          >
             <Pressable onPress={() => setCameraOpen(false)}>
               <Text style={styles.cameraCancel}>Cancelar</Text>
             </Pressable>
@@ -661,7 +666,12 @@ function FieldApp() {
         }}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.pairingSheet}>
+          <View
+            style={[
+              styles.pairingSheet,
+              { paddingBottom: Math.max(insets.bottom, 12) + 22 },
+            ]}
+          >
             {qrScanning ? (
               <>
                 <Text style={styles.pairingTitle}>Enlazar con laptop</Text>

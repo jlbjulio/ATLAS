@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import splashImage from "../../assets/splash.png";
 
@@ -13,7 +14,8 @@ interface SplashScreenProps {
   duration?: number;
 }
 
-export function SplashScreen({ onFinish, duration = 2500 }: SplashScreenProps) {
+export function SplashScreen({ onFinish, duration = 5000 }: SplashScreenProps) {
+  const insets = useSafeAreaInsets();
   const progress = useRef(new Animated.Value(0)).current;
   const fadeOut = useRef(new Animated.Value(1)).current;
 
@@ -26,7 +28,7 @@ export function SplashScreen({ onFinish, duration = 2500 }: SplashScreenProps) {
       }),
       Animated.timing(fadeOut, {
         toValue: 0,
-        duration: 400,
+        duration: 500,
         useNativeDriver: true,
       }),
     ]);
@@ -47,7 +49,12 @@ export function SplashScreen({ onFinish, duration = 2500 }: SplashScreenProps) {
         style={styles.background}
         resizeMode="cover"
       >
-        <View style={styles.progressContainer}>
+        <View
+          style={[
+            styles.progressContainer,
+            { paddingBottom: Math.max(insets.bottom, 24) + 48 },
+          ]}
+        >
           <View style={styles.progressTrack}>
             <Animated.View
               style={[
@@ -73,17 +80,16 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     paddingHorizontal: 48,
-    paddingBottom: 96,
   },
   progressTrack: {
-    height: 4,
-    borderRadius: 2,
+    height: 5,
+    borderRadius: 3,
     backgroundColor: "rgba(255, 255, 255, 0.25)",
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 2,
+    borderRadius: 3,
   },
 });
