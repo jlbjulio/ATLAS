@@ -1,71 +1,98 @@
-import { type HTMLAttributes, forwardRef } from "react";
+import { type HTMLAttributes, forwardRef } from "react"
+import { cn } from "@/lib/utils"
+import type { ObservationStatus } from "@/types"
+
+type BadgeVariant =
+  | "confirmed"
+  | "reported"
+  | "estimated"
+  | "unknown"
+  | "default"
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?:
-    | "confirmed"
-    | "reported"
-    | "estimated"
-    | "unknown"
-    | "default"
-    | "success"
-    | "warning"
-    | "danger"
-    | "info";
-  size?: "sm" | "md";
+  variant?: BadgeVariant
+  size?: "sm" | "md"
+}
+
+const VARIANT_CLASSES: Record<BadgeVariant, string> = {
+  confirmed: "bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-500/30",
+  success: "bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-500/30",
+  reported: "bg-sky-500/15 text-sky-300 ring-1 ring-inset ring-sky-500/30",
+  info: "bg-sky-500/15 text-sky-300 ring-1 ring-inset ring-sky-500/30",
+  estimated: "bg-amber-500/15 text-amber-300 ring-1 ring-inset ring-amber-500/30",
+  warning: "bg-amber-500/15 text-amber-300 ring-1 ring-inset ring-amber-500/30",
+  danger: "bg-red-500/15 text-red-300 ring-1 ring-inset ring-red-500/30",
+  unknown: "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
+  default: "bg-secondary text-secondary-foreground ring-1 ring-inset ring-border",
+}
+
+const SIZE_CLASSES = {
+  sm: "px-2 py-0.5 text-[10px]",
+  md: "px-2.5 py-1 text-xs",
 }
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
-  (
-    { variant = "default", size = "md", className = "", children, ...props },
-    ref,
-  ) => {
-    const variantClasses = {
-      confirmed: "badge-confirmed",
-      reported: "badge-reported",
-      estimated: "badge-estimated",
-      unknown: "badge-unknown",
-      default: "badge bg-surface-100 text-surface-700",
-      success: "badge bg-green-100 text-green-800",
-      warning: "badge bg-yellow-100 text-yellow-800",
-      danger: "badge bg-red-100 text-red-800",
-      info: "badge bg-blue-100 text-blue-800",
-    };
-    const sizeClasses = {
-      sm: "px-2 py-0.5 text-[10px]",
-      md: "px-2.5 py-0.5 text-xs",
-    };
+  ({ variant = "default", size = "md", className, children, ...props }, ref) => (
+    <span
+      ref={ref}
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full font-medium whitespace-nowrap",
+        VARIANT_CLASSES[variant],
+        SIZE_CLASSES[size],
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </span>
+  ),
+)
+Badge.displayName = "Badge"
 
-    return (
-      <span
-        ref={ref}
-        className={`${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
-        {...props}
-      >
-        {children}
-      </span>
-    );
-  },
-);
+export const STATUS_LABELS: Record<ObservationStatus, string> = {
+  CONFIRMED: "Confirmado",
+  REPORTED: "Reportado",
+  ESTIMATED: "Estimado",
+  UNKNOWN: "Desconocido",
+}
 
-Badge.displayName = "Badge";
+const STATUS_DESCRIPTIONS: Record<ObservationStatus, string> = {
+  CONFIRMED: "Verificado y aceptado en la base instalada.",
+  REPORTED: "Observado en campo, aún sin verificación independiente.",
+  ESTIMATED: "Inferido por el modelo; requiere confirmación humana.",
+  UNKNOWN: "Dato faltante o no concluyente.",
+}
+
+const STATUS_VARIANT: Record<ObservationStatus, BadgeVariant> = {
+  CONFIRMED: "confirmed",
+  REPORTED: "reported",
+  ESTIMATED: "estimated",
+  UNKNOWN: "unknown",
+}
 
 export function StatusBadge({
   status,
   size = "md",
+  showLabel,
+  className,
 }: {
-  status: "CONFIRMED" | "REPORTED" | "ESTIMATED" | "UNKNOWN";
-  size?: "sm" | "md";
+  status: ObservationStatus
+  size?: "sm" | "md"
+  showLabel?: boolean
+  className?: string
 }) {
-  const variantMap = {
-    CONFIRMED: "confirmed" as const,
-    REPORTED: "reported" as const,
-    ESTIMATED: "estimated" as const,
-    UNKNOWN: "unknown" as const,
-  };
-
   return (
-    <Badge variant={variantMap[status]} size={size}>
-      {status}
+    <Badge
+      variant={STATUS_VARIANT[status]}
+      size={size}
+      className={className}
+      title={STATUS_DESCRIPTIONS[status]}
+    >
+      {showLabel ? STATUS_LABELS[status] : status}
     </Badge>
-  );
+  )
 }

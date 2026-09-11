@@ -22,6 +22,8 @@ import {
   Badge,
   StatusBadge,
   Modal,
+  PageHeader,
+  EmptyState,
 } from "@/components/common"
 import {
   Table,
@@ -320,14 +322,11 @@ export function InstalledBasePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Base Instalada</h1>
-          <p className="mt-1 text-muted-foreground">
-            Gestión y visualización de equipos por cliente y geografía
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Customer 360"
+        title="Base Instalada"
+        description="Explora los equipos por cliente y geografía, revisa su calidad y detecta oportunidades de renovación."
+      />
 
       <Card>
         <CardHeader>
@@ -342,7 +341,7 @@ export function InstalledBasePage() {
                 placeholder="Buscar cliente, ciudad, país..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="input pl-10 w-full"
+                className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-3 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               />
             </div>
             <Select
@@ -528,13 +527,27 @@ export function InstalledBasePage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={columns.length} className="h-32 text-center">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <Database className="w-8 h-8 text-muted-foreground/50" />
-                          <p className="text-muted-foreground">
-                            No se encontraron clientes
-                          </p>
-                        </div>
+                      <TableCell colSpan={columns.length} className="h-40 text-center">
+                        <EmptyState
+                          className="border-0 bg-transparent"
+                          icon={<Database className="h-6 w-6" />}
+                          title="No se encontraron clientes"
+                          description="Ajusta los filtros o limpia la búsqueda para ver toda la base."
+                          action={
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setSearchQuery("")
+                                setModalityFilter("")
+                                setStatusFilter("")
+                                setBrandFilter("")
+                              }}
+                            >
+                              Limpiar filtros
+                            </Button>
+                          }
+                        />
                       </TableCell>
                     </TableRow>
                   )}
@@ -603,7 +616,11 @@ export function InstalledBasePage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <StatusBadge status={equipment.status} size="sm" />
+                          <StatusBadge
+                            status={equipment.status}
+                            size="sm"
+                            showLabel
+                          />
                           <span className="font-medium text-foreground">
                             {equipment.modality}
                           </span>

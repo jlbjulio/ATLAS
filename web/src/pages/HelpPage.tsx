@@ -5,8 +5,9 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
+  Button,
+  PageHeader,
 } from "@/components/common"
-import { Button } from "@/components/common"
 import {
   BookOpen,
   Github,
@@ -118,7 +119,7 @@ const sections = [
       },
       {
         title: "Oportunidades de Renovación",
-        description: "Criterios para flaggear equipos candidatos a renovación",
+        description: "Criterios para marcar equipos candidatos a renovación",
         icon: Clock,
       },
     ],
@@ -135,7 +136,7 @@ const faqs = [
     a: "Usa QVAC SDK con: Qwen3 0.6B para extracción de equipos, Whisper Small para transcripción de voz, y EmbeddingGemma para búsquedas semánticas. Todos corren localmente via llama.cpp / whisper.cpp.",
   },
   {
-    q: "¿Cómo funciona la inferencia P2P должна?",
+    q: "¿Cómo funciona la inferencia P2P delegada?",
     a: 'La laptop del hospital actúa como "provider" QVAC (startQVACProvider). El móvil se conecta via Hyperswarm DHT y delega tareas pesadas (visión, embeddings grandes) a la laptop. Si falla, cae a inferencia local (fallbackToLocal).',
   },
   {
@@ -187,14 +188,11 @@ export function HelpPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">
-          Ayuda y Documentación
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Guías, FAQ y recursos para sacar el máximo partido a ATLAS
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Soporte"
+        title="Ayuda y documentación"
+        description="Guías, preguntas frecuentes y recursos para sacar el máximo partido a ATLAS."
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
@@ -321,7 +319,7 @@ export function HelpPage() {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-primary">
+                  <p className="font-medium text-primary-readable">
                     Versión Hackathon Demo
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">

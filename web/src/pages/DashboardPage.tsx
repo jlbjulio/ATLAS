@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import {
   Database,
@@ -9,6 +9,10 @@ import {
   Search,
   Mic,
   Loader2,
+  Camera,
+  MessageCircle,
+  MapPin,
+  ShieldCheck,
 } from "lucide-react"
 import {
   Card,
@@ -16,12 +20,23 @@ import {
   CardTitle,
   CardContent,
   CardDescription,
+  Button,
+  PageHeader,
+  EmptyState,
+  ConfidenceMeter,
 } from "@/components/common"
-import { Button } from "@/components/common"
 import { api, type DashboardStats } from "@/services/api"
 import { mapDashboard, mapInstalledBase } from "@/lib/mappers"
 import type { ClientInstalledBase } from "@/types"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts"
 import { MetricCard } from "@/components/ui/metric-card"
 
 interface DashboardStatsExtended extends DashboardStats {
@@ -45,6 +60,13 @@ const STATUS_COLOR_MAP: Record<string, string> = {
   Desconocido: "var(--muted-foreground)",
 }
 
+const FLOW_STEPS = [
+  { icon: Camera, title: "Captura", text: "Foto, voz o texto en campo." },
+  { icon: MessageCircle, title: "Comprensión", text: "Modelos locales estructuran." },
+  { icon: ShieldCheck, title: "Revisión", text: "Tú confirmas cada dato." },
+  { icon: Database, title: "Decisión", text: "Base verificable y accionable." },
+]
+
 export function DashboardPage() {
   const navigate = useNavigate()
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -63,7 +85,7 @@ export function DashboardPage() {
         setStats(mapDashboard(dashboardStats) as DashboardStatsExtended)
         setClients(mapInstalledBase(installedBase))
       } catch (err) {
-        setError("Error cargando el dashboard")
+        setError("Error cargando el panel")
         console.error("Dashboard load error:", err)
       } finally {
         setLoading(false)
@@ -72,34 +94,57 @@ export function DashboardPage() {
     loadDashboard()
   }, [])
 
+  const allEquipments = useMemo(
+    () => clients.flatMap((c) => c.equipments),
+    [clients]
+  )
+
+  const avgConfidence = useMemo(() => {
+    if (allEquipments.length === 0) return 0
+    return (
+      allEquipments.reduce((sum, e) => sum + (e.confidence || 0), 0) /
+      allEquipments.length
+    )
+  }, [allEquipments])
+
+  const territory = useMemo(() => {
+    const map = new Map<
+      string,
+      { country: string; clients: number; equipments: number }
+    >()
+    clients.forEach((c) => {
+      const key = c.country || "Sin país"
+      const current =
+        map.get(key) ?? { country: key, clients: 0, equipments: 0 }
+      current.clients += 1
+      current.equipments += c.totalEquipmentCount
+      map.set(key, current)
+    })
+    return [...map.values()]
+      .sort((a, b) => b.equipments - a.equipments)
+      .slice(0, 5)
+  }, [clients])
+
   if (loading) {
     return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        </div>
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-readable" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="space-y-8">
-        <div className="text-center py-12">
-          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-foreground mb-2">
-            Error al cargar
-          </h2>
-          <p className="text-muted-foreground">{error}</p>
-          <Button
-            variant="primary"
-            onClick={() => window.location.reload()}
-            className="mt-4"
-          >
+      <EmptyState
+        icon={<AlertTriangle className="h-6 w-6 text-red-300" />}
+        title="Error al cargar"
+        description={error}
+        action={
+          <Button variant="primary" onClick={() => window.location.reload()}>
             Reintentar
           </Button>
-        </div>
-      </div>
+        }
+      />
     )
   }
 
@@ -122,49 +167,61 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-5 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-accent">
-            Inteligencia de base instalada
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Dashboard
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Visión general de la base instalada y actividad reciente
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Button             variant="primary" onClick={() => navigate("/capture")}>
-            <Mic className="w-4 h-4 mr-2" /> Nueva Captura
-          </Button>
-          <Button variant="secondary" onClick={() => navigate("/queries")}>
-            <Search className="w-4 h-4 mr-2" /> Consultar
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Installed Base Intelligence"
+        title="Inicio"
+        description="Del trabajo de campo a una decisión: la base instalada verificable, su calidad y las oportunidades de renovación."
+        actions={
+          <>
+            <Button variant="primary" onClick={() => navigate("/capture")}>
+              <Mic className="h-4 w-4" /> Nueva captura
+            </Button>
+            <Button variant="secondary" onClick={() => navigate("/queries")}>
+              <Search className="h-4 w-4" /> Consultar
+            </Button>
+          </>
+        }
+      />
+
+      <Card className="bg-card/60">
+        <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          {FLOW_STEPS.map((step) => (
+            <div key={step.title} className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-primary/10 text-primary-readable">
+                <step.icon className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {step.title}
+                </p>
+                <p className="text-xs text-muted-foreground">{step.text}</p>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          title="Total Equipos"
+          title="Total equipos"
           value={totalEquipments}
           icon={<Database className="w-5 h-5" />}
           color="blue"
         />
         <MetricCard
-          title="Clientes Activos"
+          title="Clientes activos"
           value={totalClients}
           icon={<CheckCircle className="w-5 h-5" />}
           color="emerald"
         />
         <MetricCard
-          title="Por Confirmar"
+          title="Por confirmar"
           value={pendingConfirmations}
           icon={<Clock className="w-5 h-5" />}
           color="amber"
         />
         <MetricCard
-          title="Oportunidades Renovación"
+          title="Oportunidades de renovación"
           value={renewalOpportunities}
           icon={<TrendingUp className="w-5 h-5" />}
           color="orange"
@@ -174,28 +231,26 @@ export function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Top Clientes por Equipos</CardTitle>
-            <CardDescription>
-              Clientes con mayor base instalada
-            </CardDescription>
+            <CardTitle>Top clientes por equipos</CardTitle>
+            <CardDescription>Mayor base instalada registrada</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {topClients.length > 0 ? (
-                topClients.map((client) => (
+            {topClients.length > 0 ? (
+              <div className="space-y-2">
+                {topClients.map((client) => (
                   <Link
                     key={client.clientName}
                     to={`/installed-base/${client.clientName}`}
-                    className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted transition-colors group"
+                    className="group flex items-center gap-4 rounded-lg p-3 transition-colors hover:bg-muted"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors">
-                      <Database className="w-5 h-5 text-primary" />
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
+                      <Database className="h-5 w-5 text-primary-readable" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">
                         {client.clientName}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="truncate text-xs text-muted-foreground">
                         {client.city}, {client.country}
                       </p>
                     </div>
@@ -203,25 +258,81 @@ export function DashboardPage() {
                       <p className="text-lg font-bold text-foreground">
                         {client.totalEquipmentCount}
                       </p>
-                      <p className="text-xs text-destructive">Ver detalles</p>
+                      <p className="text-xs text-primary-readable">
+                        Ver detalle
+                      </p>
                     </div>
                   </Link>
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No hay datos de clientes
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={<Database className="h-6 w-6" />}
+                title="Sin clientes todavía"
+                description="Captura tu primera observación para poblar la base instalada."
+                action={
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => navigate("/capture")}
+                  >
+                    <Mic className="h-4 w-4" /> Nueva captura
+                  </Button>
+                }
+              />
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Distribución por Modalidad</CardTitle>
+            <CardTitle>Calidad de datos</CardTitle>
             <CardDescription>
-              Equipos en la base instalada por tipo
+              Puntaje explicable según completitud y evidencia
             </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <ConfidenceMeter
+              value={avgConfidence}
+              description="Promedio de confianza de los equipos registrados."
+            />
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Estado de observaciones
+              </p>
+              {Object.keys(statusCounts).length > 0 ? (
+                Object.entries(statusCounts).map(([label, value]) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <div
+                      className="h-3 w-3 rounded"
+                      style={{
+                        backgroundColor:
+                          STATUS_COLOR_MAP[label] ?? "var(--muted-foreground)",
+                      }}
+                    />
+                    <span className="flex-1 text-sm text-muted-foreground">
+                      {label}
+                    </span>
+                    <span className="text-sm font-medium text-foreground">
+                      {value}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Aún no hay estados registrados.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Distribución por modalidad</CardTitle>
+            <CardDescription>Equipos por tipo en la base</CardDescription>
           </CardHeader>
           <CardContent>
             {modalityData.length > 0 ? (
@@ -250,11 +361,7 @@ export function DashboardPage() {
                       }}
                       cursor={{ fill: "var(--muted)" }}
                     />
-                    <Bar
-                      dataKey="value"
-                      radius={[0, 4, 4, 0]}
-                      maxBarSize={28}
-                    >
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={28}>
                       {modalityData.map((_, index) => (
                         <Cell
                           key={`cell-${index}`}
@@ -266,45 +373,48 @@ export function DashboardPage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">
-                La distribución aparecerá cuando haya equipos registrados.
-              </div>
+              <EmptyState
+                icon={<Database className="h-6 w-6" />}
+                title="Sin distribución"
+                description="Aparecerá cuando haya equipos registrados."
+              />
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid gap-6 lg:grid-cols-1">
         <Card>
           <CardHeader>
-            <CardTitle>Estado de Observaciones</CardTitle>
+            <CardTitle>Territory Intelligence</CardTitle>
+            <CardDescription>Equipos agregados por país</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {Object.keys(statusCounts).length > 0 ? (
-                Object.entries(statusCounts).map(([label, value]) => (
-                  <div key={label} className="flex items-center gap-3">
-                    <div
-                      className="w-3 h-3 rounded"
-                      style={{
-                        backgroundColor:
-                          STATUS_COLOR_MAP[label] ?? "var(--muted-foreground)",
-                      }}
-                    />
-                    <span className="text-sm text-muted-foreground flex-1">
-                      {label}
+            {territory.length > 0 ? (
+              <div className="space-y-3">
+                {territory.map((row) => (
+                  <div
+                    key={row.country}
+                    className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2"
+                  >
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span className="flex-1 text-sm text-foreground">
+                      {row.country}
                     </span>
-                    <span className="text-sm font-medium text-foreground">
-                      {value}
+                    <span className="text-xs text-muted-foreground">
+                      {row.clients} clientes
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {row.equipments}
                     </span>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Aún no hay estados registrados.
-                </p>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={<MapPin className="h-6 w-6" />}
+                title="Sin datos geográficos"
+                description="Registra clientes con ciudad y país para ver el agregado."
+              />
+            )}
           </CardContent>
         </Card>
       </div>

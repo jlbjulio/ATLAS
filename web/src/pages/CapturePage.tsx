@@ -18,6 +18,9 @@ import {
   Badge,
   Modal,
   StatusBadge,
+  Stepper,
+  ConfidenceMeter,
+  EvidenceOrigin,
 } from "@/components/common"
 import { ObservationForm } from "@/components/forms"
 import { useObservations } from "@/hooks/useObservations"
@@ -42,6 +45,8 @@ export function CapturePage() {
   const [lastExtraction, setLastExtraction] =
     useState<QVACExtractionResult | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+
+  const currentStep = draftSaved ? 2 : extractionResult ? 1 : 0
 
   const handleExtract = async (
     formData: CaptureFormData
@@ -115,19 +120,19 @@ export function CapturePage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <section className="relative overflow-hidden rounded-xl bg-sidebar px-6 py-7 text-sidebar-foreground shadow-sm sm:px-8">
+      <section className="relative overflow-hidden rounded-xl border border-sidebar-border bg-sidebar px-6 py-7 text-sidebar-foreground shadow-sm sm:px-8">
         <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border border-cyan-400/20 bg-cyan-400/5 blur-2xl" />
         <div className="relative max-w-2xl">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-400">
-            Smart capture · operación local
+            Captura inteligente · operación local
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl text-sidebar-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-sidebar-foreground sm:text-3xl">
             De la evidencia del campo a una decisión.
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-sidebar-foreground/70">
+          <p className="mt-3 max-w-xl text-sm leading-6 text-sidebar-foreground/80">
             Captura una nota, voz o placa autorizada. ATLAS estructura la
-            observación para que puedas revisarla antes de incorporarla a la base
-            instalada.
+            observación para que puedas revisarla antes de incorporarla a la
+            base instalada.
           </p>
           <div className="mt-6 grid max-w-xl grid-cols-4 gap-2 sm:gap-5">
             {[
@@ -138,9 +143,9 @@ export function CapturePage() {
             ].map(([Icon, label]) => (
               <div
                 key={label as string}
-                className="flex items-center gap-2 text-xs text-sidebar-foreground/70"
+                className="flex items-center gap-2 text-xs text-sidebar-foreground/80"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-400/10 text-cyan-400">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-400/10 text-cyan-300">
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="hidden sm:inline">{label as string}</span>
@@ -151,77 +156,48 @@ export function CapturePage() {
       </section>
 
       {initError && (
-        <Card className="border border-red-900/50 bg-red-950/30">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-red-400">Error al inicializar QVAC</p>
-                <p className="text-sm text-red-400/70">{initError}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!isInitialized && !initError && (
         <div
-          className="flex items-center gap-3 rounded-lg border border-emerald-900/50 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-400"
-          role="status"
+          className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          role="alert"
         >
-          <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-400" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
           <div>
-            <p className="font-medium">Procesamiento local disponible</p>
-            <p className="text-emerald-400/70">
-              La verificación de QVAC se realizará al analizar la observación.
-            </p>
+            <p className="font-medium">Error al inicializar QVAC</p>
+            <p className="text-red-200/80">{initError}</p>
           </div>
         </div>
       )}
 
-      {isInitialized && (
-        <div
-          className="flex items-center gap-3 rounded-lg border border-emerald-900/50 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-400"
-          role="status"
-        >
-          <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-400" />
-          <div>
-            <p className="font-medium">QVAC local verificado</p>
-            <p className="text-emerald-400/70">
-              La inferencia de esta captura se ejecutará en el dispositivo.
-            </p>
-          </div>
+      <div
+        className="flex items-start gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+        role="status"
+      >
+        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
+        <div>
+          <p className="font-medium">
+            {isInitialized
+              ? "QVAC local verificado"
+              : "Procesamiento local disponible"}
+          </p>
+          <p className="text-emerald-200/80">
+            {isInitialized
+              ? "La inferencia de esta captura se ejecutará en el dispositivo."
+              : "La verificación de QVAC se realizará al analizar la observación."}
+          </p>
         </div>
-      )}
+      </div>
 
-      <ol className="grid grid-cols-3 gap-2" aria-label="Flujo de captura">
-        {["Observar", "Revisar extracción", "Confirmar"].map((step, index) => {
-          const active =
-            index === 0 ||
-            (index === 1 && extractionResult) ||
-            (index === 2 && draftSaved)
-          return (
-            <li
-              key={step}
-              className={`border-t-2 pt-2 text-xs font-medium ${
-                active
-                  ? "border-primary text-primary"
-                  : "border-border text-muted-foreground"
-              }`}
-            >
-              <span className="mr-1 text-[10px]">0{index + 1}</span>
-              {step}
-            </li>
-          )
-        })}
-      </ol>
+      <Stepper
+        steps={["Observar", "Revisar y editar", "Confirmar"]}
+        current={currentStep}
+      />
 
       {draftSaved && !showSuccess && (
         <div
-          className="flex items-center gap-3 rounded-lg border border-emerald-900/50 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-400"
+          className="flex items-center gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
           role="status"
         >
-          <CheckCircle className="h-4 w-4 shrink-0" />
+          <CheckCircle className="h-4 w-4 shrink-0 text-emerald-300" />
           Borrador guardado localmente. Revisa los cambios y confirma para
           incorporarlo a la base instalada.
         </div>
@@ -229,10 +205,10 @@ export function CapturePage() {
 
       {actionError && (
         <div
-          className="flex items-center gap-3 rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-400"
+          className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
           role="alert"
         >
-          <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
+          <AlertTriangle className="h-5 w-5 shrink-0 text-red-300" />
           <p>{actionError}</p>
         </div>
       )}
@@ -254,40 +230,28 @@ export function CapturePage() {
       {extractionResult && extractionResult.equipments.length > 0 && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Resumen de Extracción</CardTitle>
-                <CardDescription>
-                  Confianza global:{" "}
-                  {(extractionResult.confidence * 100).toFixed(0)}%
-                </CardDescription>
-              </div>
-              <Badge
-                variant={
-                  extractionResult.confidence > 0.8
-                    ? "success"
-                    : extractionResult.confidence > 0.6
-                      ? "warning"
-                      : "danger"
-                }
-              >
-                {extractionResult.confidence > 0.8
-                  ? "Alta"
-                  : extractionResult.confidence > 0.6
-                    ? "Media"
-                    : "Baja"}{" "}
-                Confianza
-              </Badge>
-            </div>
+            <CardTitle>Revisión y confirmación</CardTitle>
+            <CardDescription>
+              ATLAS propone {extractionResult.equipments.length}{" "}
+              {extractionResult.equipments.length === 1
+                ? "registro"
+                : "registros"}
+              . Confirma solo cuando lo revisado sea correcto.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
+            <ConfidenceMeter
+              value={extractionResult.confidence}
+              description="Puntaje según completitud del registro y evidencia disponible."
+            />
+
             <div className="grid gap-2 sm:grid-cols-2">
               {extractionResult.equipments.map((eq, i) => (
                 <div
                   key={i}
-                  className="p-3 bg-muted rounded-lg border border-border"
+                  className="rounded-lg border border-border bg-muted/50 p-3"
                 >
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="mb-1 flex items-center gap-2">
                     <Badge variant="default" size="sm">
                       {eq.modality}
                     </Badge>
@@ -296,12 +260,12 @@ export function CapturePage() {
                         {eq.brand}
                       </Badge>
                     )}
-                    <StatusBadge status={eq.status} size="sm" />
+                    <StatusBadge status={eq.status} size="sm" showLabel />
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-foreground">
                     {eq.model || "Modelo no detectado"}
                   </p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                  <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                     {eq.ageYears && <span>{eq.ageYears} años</span>}
                     <span>×{eq.quantity}</span>
                     <span>Conf: {(eq.confidence * 100).toFixed(0)}%</span>
@@ -309,16 +273,25 @@ export function CapturePage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 flex gap-3">
+
+            <EvidenceOrigin
+              observerName="Usuario Demo"
+              imageCount={lastFormData?.imageUris?.length ?? 0}
+              hasAudio={Boolean(lastFormData?.audioUri)}
+              synced={false}
+            />
+
+            <div className="flex flex-wrap gap-3 border-t border-border pt-4">
               <Button
                 variant="primary"
                 onClick={handleConfirm}
                 loading={isConfirming}
               >
-                Confirmar y Guardar
+                <CheckCircle className="h-4 w-4" />
+                Confirmar e incorporar
               </Button>
               <Button variant="secondary" onClick={handleNewCapture}>
-                Nueva Captura
+                Nueva captura
               </Button>
             </div>
           </CardContent>
@@ -333,25 +306,26 @@ export function CapturePage() {
           size="sm"
         >
           <div className="text-center">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-emerald-400" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15">
+              <CheckCircle className="h-8 w-8 text-emerald-300" />
             </div>
-            <h3 className="text-lg font-medium text-foreground mb-2">
+            <h3 className="mb-2 text-lg font-medium text-foreground">
               Observación registrada correctamente
             </h3>
-            <p className="text-muted-foreground mb-6">
+            <p className="mb-6 text-muted-foreground">
               La información fue confirmada y está disponible en la base
-              instalada.
+              instalada. Cada cambio deja evidencia de auditoría en el
+              dispositivo.
             </p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex justify-center gap-3">
               <Button variant="primary" onClick={handleNewCapture}>
-                Nueva Captura
+                Nueva captura
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => navigate("/installed-base")}
               >
-                Ver Base Instalada
+                Ver base instalada
               </Button>
             </div>
           </div>

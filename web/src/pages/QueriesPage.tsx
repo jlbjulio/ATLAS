@@ -19,6 +19,8 @@ import {
   Button,
   Badge,
   StatusBadge,
+  PageHeader,
+  EmptyState,
 } from "@/components/common"
 import { SearchForm } from "@/components/forms"
 import { api } from "@/services/api"
@@ -171,25 +173,19 @@ export function QueriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">
-            Consultas en Lenguaje Natural
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Conversa con ATLAS sobre la base instalada, como lo harías con un
-            colega.
-          </p>
-        </div>
-        <div className="flex gap-2">
+      <PageHeader
+        eyebrow="Consultas en lenguaje natural"
+        title="Pregúntale a ATLAS"
+        description="Consultas convertidas en filtros permitidos sobre la base instalada. Nunca se ejecuta SQL generado por un modelo."
+        actions={
           <Button
             variant="secondary"
             onClick={() => setShowExamples(!showExamples)}
           >
             <ChevronDown className="w-4 h-4 mr-1" /> Ejemplos
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
@@ -293,15 +289,12 @@ export function QueriesPage() {
                   </CardHeader>
                   <CardContent>
                     {currentQuery.results.length === 0 ? (
-                      <div className="text-center py-12">
-                        <Database className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-foreground">
-                          Sin resultados
-                        </h3>
-                        <p className="text-muted-foreground mt-1">
-                          No se encontraron coincidencias para tu consulta
-                        </p>
-                      </div>
+                      <EmptyState
+                        className="border-0 bg-transparent"
+                        icon={<Database className="h-6 w-6" />}
+                        title="Sin resultados"
+                        description="No se encontraron coincidencias. Prueba reformular la pregunta con otra modalidad, marca o país."
+                      />
                     ) : (
                       <div className="space-y-4">
                         {currentQuery.results.map((client) => (

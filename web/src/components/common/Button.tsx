@@ -1,13 +1,28 @@
-import { forwardRef, type ButtonHTMLAttributes } from "react";
-import { Loader2 } from "lucide-react";
-import { Slot } from "@radix-ui/react-slot";
+import { type ButtonHTMLAttributes, forwardRef } from "react"
+import { Button as UIButton } from "@/components/ui/button"
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-  size?: "sm" | "md" | "lg";
-  loading?: boolean;
-  fullWidth?: boolean;
-  asChild?: boolean;
+type CommonVariant = "primary" | "secondary" | "ghost" | "danger"
+type CommonSize = "sm" | "md" | "lg"
+
+interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "size"> {
+  variant?: CommonVariant
+  size?: CommonSize
+  loading?: boolean
+  fullWidth?: boolean
+  asChild?: boolean
+}
+
+const VARIANT_MAP: Record<CommonVariant, "default" | "secondary" | "ghost" | "destructive"> = {
+  primary: "default",
+  secondary: "secondary",
+  ghost: "ghost",
+  danger: "destructive",
+}
+
+const SIZE_MAP: Record<CommonSize, "sm" | "default" | "lg"> = {
+  sm: "sm",
+  md: "default",
+  lg: "lg",
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -17,41 +32,28 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       size = "md",
       loading = false,
       fullWidth = false,
-      disabled,
-      children,
       className = "",
       asChild = false,
+      children,
+      disabled,
       ...props
     },
     ref,
   ) => {
-    const baseClasses = "btn";
-    const variantClasses = {
-      primary: "btn-primary",
-      secondary: "btn-secondary",
-      ghost: "btn-ghost",
-      danger: "btn-danger",
-    };
-    const sizeClasses = {
-      sm: "px-3 py-1.5 text-xs",
-      md: "px-4 py-2 text-sm",
-      lg: "px-6 py-3 text-base",
-    };
-
-    const Comp = asChild ? Slot : "button";
-
     return (
-      <Comp
+      <UIButton
         ref={ref}
-        className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${fullWidth ? "w-full" : ""} ${className}`}
-        disabled={disabled || loading}
+        variant={VARIANT_MAP[variant]}
+        size={SIZE_MAP[size]}
+        loading={loading}
+        asChild={asChild}
+        disabled={disabled}
+        className={`${fullWidth ? "w-full" : ""} ${className}`}
         {...props}
       >
-        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
         {children}
-      </Comp>
-    );
+      </UIButton>
+    )
   },
-);
-
-Button.displayName = "Button";
+)
+Button.displayName = "Button"

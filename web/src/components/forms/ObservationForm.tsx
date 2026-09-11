@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertTriangle, Mic, Loader2, Sparkles, X, Square } from "lucide-react";
+import { Mic, Loader2, Sparkles, X, Square } from "lucide-react";
 import {
   Button,
   Textarea,
@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
+  NextBestQuestion,
 } from "@/components/common";
 import type {
   CaptureFormData,
@@ -303,7 +304,9 @@ export function ObservationForm({
           />
 
           <div>
-            <label className="label">Observación (voz o texto)</label>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Observación (voz o texto)
+            </label>
             <div className="relative">
               <Textarea
                 value={formData.rawText}
@@ -348,18 +351,18 @@ export function ObservationForm({
                 </Button>
               </div>
             </div>
-            <p className={`mt-2 text-xs ${voiceError ? "text-red-600" : "text-surface-500"}`} role={voiceError ? "alert" : "status"}>
+            <p className={`mt-2 text-xs ${voiceError ? "text-red-300" : "text-muted-foreground"}`} role={voiceError ? "alert" : "status"}>
               {voiceStatus}
             </p>
             {errors.rawText && (
-              <p className="mt-1 text-sm text-red-600" role="alert">
+              <p className="mt-1 text-sm text-red-300" role="alert">
                 {errors.rawText}
               </p>
             )}
           </div>
 
           <div>
-            <label className="label">
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
               Fotos de placas/etiquetas (opcional)
             </label>
             <input
@@ -367,8 +370,12 @@ export function ObservationForm({
               accept="image/*"
               multiple
               onChange={(e) => handleFileUpload(e, "imageUris")}
-              className="input cursor-pointer"
+              className="w-full cursor-pointer rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-secondary-foreground hover:file:bg-secondary/80"
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              No se admiten pacientes, expedientes, gafetes ni rostros. Las
+              imágenes permanecen en el dispositivo.
+            </p>
             {formData.imageUris && formData.imageUris.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {formData.imageUris.map((uri, index) => (
@@ -376,7 +383,7 @@ export function ObservationForm({
                     <img
                       src={uri}
                       alt={`Foto ${index + 1}`}
-                      className="w-16 h-16 object-cover rounded-lg border border-surface-200"
+                      className="h-16 w-16 rounded-lg border border-border object-cover"
                     />
                     <button
                       type="button"
@@ -393,15 +400,15 @@ export function ObservationForm({
           </div>
 
           {editableExtraction && editableExtraction.equipments.length > 0 && (
-            <div className="border-t border-surface-200 pt-6">
-              <h3 className="text-lg font-medium text-surface-900 mb-4">
+            <div className="border-t border-border pt-6">
+              <h3 className="mb-4 text-lg font-medium text-foreground">
                 Equipos extraídos (revisa antes de guardar)
               </h3>
               <div className="space-y-3">
                 {editableExtraction.equipments.map((eq, index) => (
                   <div
                     key={index}
-                    className="p-4 bg-surface-50 rounded-lg border border-surface-200"
+                    className="rounded-lg border border-border bg-muted/50 p-4"
                   >
                     <div className="grid gap-3 md:grid-cols-4">
                       <Select
@@ -487,35 +494,15 @@ export function ObservationForm({
                 ))}
               </div>
 
-              {(editableExtraction.missingFields.length > 0 ||
-                editableExtraction.followUpQuestions.length > 0) && (
-                <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <h4 className="font-medium text-yellow-800 mb-2">
-                    <span className="inline-flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      Campos faltantes / Preguntas de seguimiento
-                    </span>
-                  </h4>
-                  {editableExtraction.missingFields.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-yellow-700 space-y-1">
-                      {editableExtraction.missingFields.map((field, i) => (
-                        <li key={i}>{field}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {editableExtraction.followUpQuestions.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-yellow-700 space-y-1 mt-2">
-                      {editableExtraction.followUpQuestions.map((q, i) => (
-                        <li key={i}>{q}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+              <NextBestQuestion
+                missingFields={editableExtraction.missingFields}
+                followUpQuestions={editableExtraction.followUpQuestions}
+                className="mt-4"
+              />
             </div>
           )}
 
-          <div className="flex justify-end gap-3 border-t border-surface-200 pt-6">
+          <div className="flex justify-end gap-3 border-t border-border pt-6">
             <Button type="button" variant="secondary" onClick={onCancel}>
               Cancelar
             </Button>
