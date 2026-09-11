@@ -23,6 +23,30 @@ const SettingsPage = lazy(() =>
 const HelpPage = lazy(() =>
   import("@/pages/HelpPage").then((m) => ({ default: m.HelpPage })),
 )
+const EquipmentsPage = lazy(() =>
+  import("@/pages/EquipmentsPage").then((m) => ({ default: m.EquipmentsPage })),
+)
+const OpportunitiesPage = lazy(() =>
+  import("@/pages/OpportunitiesPage").then((m) => ({
+    default: m.OpportunitiesPage,
+  })),
+)
+const PendingPage = lazy(() =>
+  import("@/pages/PendingPage").then((m) => ({ default: m.PendingPage })),
+)
+const CustomersPage = lazy(() =>
+  import("@/pages/CustomersPage").then((m) => ({ default: m.CustomersPage })),
+)
+const TerritoriesPage = lazy(() =>
+  import("@/pages/TerritoriesPage").then((m) => ({
+    default: m.TerritoriesPage,
+  })),
+)
+const DataQualityPage = lazy(() =>
+  import("@/pages/DataQualityPage").then((m) => ({
+    default: m.DataQualityPage,
+  })),
+)
 
 function RouteFallback() {
   return (
@@ -47,6 +71,12 @@ function App() {
             path="/installed-base/:clientName"
             element={<InstalledBasePage />}
           />
+          <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/equipment" element={<EquipmentsPage />} />
+          <Route path="/opportunities" element={<OpportunitiesPage />} />
+          <Route path="/pending" element={<PendingPage />} />
+          <Route path="/territories" element={<TerritoriesPage />} />
+          <Route path="/data-quality" element={<DataQualityPage />} />
           <Route path="/queries" element={<QueriesPage />} />
           <Route path="/capture" element={<CapturePage />} />
           <Route path="/settings" element={<SettingsPage />} />

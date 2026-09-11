@@ -2,7 +2,7 @@ import { type ButtonHTMLAttributes, forwardRef } from "react"
 import { Button as UIButton } from "@/components/ui/button"
 
 type CommonVariant = "primary" | "secondary" | "ghost" | "danger"
-type CommonSize = "sm" | "md" | "lg"
+type CommonSize = "sm" | "md" | "lg" | "icon"
 
 interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "size"> {
   variant?: CommonVariant
@@ -19,10 +19,11 @@ const VARIANT_MAP: Record<CommonVariant, "default" | "secondary" | "ghost" | "de
   danger: "destructive",
 }
 
-const SIZE_MAP: Record<CommonSize, "sm" | "default" | "lg"> = {
+const SIZE_MAP: Record<CommonSize, "sm" | "default" | "lg" | "icon"> = {
   sm: "sm",
   md: "default",
   lg: "lg",
+  icon: "icon",
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(

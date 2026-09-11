@@ -11,12 +11,12 @@ function level(value: number) {
   if (value >= 0.8)
     return {
       label: "Alta",
-      text: "text-emerald-300",
-      bar: "bg-emerald-400",
+      text: "text-success",
+      bar: "bg-success",
     }
   if (value >= 0.6)
-    return { label: "Media", text: "text-amber-300", bar: "bg-amber-400" }
-  return { label: "Baja", text: "text-red-300", bar: "bg-red-400" }
+    return { label: "Media", text: "text-accent", bar: "bg-accent" }
+  return { label: "Baja", text: "text-destructive", bar: "bg-destructive" }
 }
 
 export function ConfidenceMeter({

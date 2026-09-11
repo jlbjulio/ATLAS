@@ -323,8 +323,8 @@ export function InstalledBasePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Customer 360"
-        title="Base Instalada"
+        eyebrow="Base instalada"
+        title="Explorar base"
         description="Explora los equipos por cliente y geografía, revisa su calidad y detecta oportunidades de renovación."
       />
 
@@ -398,7 +398,7 @@ export function InstalledBasePage() {
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Database className="w-6 h-6 text-primary" />
+                <Database className="w-6 h-6 text-primary-readable" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Equipos</p>
@@ -412,8 +412,8 @@ export function InstalledBasePage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-emerald-400" />
+              <div className="w-12 h-12 rounded-xl bg-success-soft flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-success-soft-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Confirmados</p>
@@ -427,8 +427,8 @@ export function InstalledBasePage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <Clock className="w-6 h-6 text-amber-400" />
+              <div className="w-12 h-12 rounded-xl bg-warning-soft flex items-center justify-center">
+                <Clock className="w-6 h-6 text-warning-soft-foreground" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pendientes</p>

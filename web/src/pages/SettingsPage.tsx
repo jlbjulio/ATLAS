@@ -22,13 +22,14 @@ import {
   Badge,
   PageHeader,
 } from "@/components/common"
+import { useTheme } from "@/lib/theme"
 
 export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<
     "general" | "qvac" | "sync" | "appearance" | "notifications"
   >("general")
   const [isSaving, setIsSaving] = useState(false)
-  const [theme, setTheme] = useState("system")
+  const { theme, setTheme } = useTheme()
   const [density, setDensity] = useState("standard")
 
   const tabs = [
@@ -238,7 +239,7 @@ export function SettingsPage() {
                   </h4>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <label className="label-base">Temperatura (creatividad)</label>
+                      <label className="mb-1.5 block text-sm font-medium text-foreground">Temperatura (creatividad)</label>
                       <input
                         type="range"
                         min="0"
@@ -252,7 +253,7 @@ export function SettingsPage() {
                       </p>
                     </div>
                     <div>
-                      <label className="label-base">Max Tokens</label>
+                      <label className="mb-1.5 block text-sm font-medium text-foreground">Max Tokens</label>
                       <Input type="number" min={512} max={4096} step={512} defaultValue={2048} />
                     </div>
                     <div>
@@ -267,7 +268,7 @@ export function SettingsPage() {
                       />
                     </div>
                     <div>
-                      <label className="label-base">Contexto máximo</label>
+                      <label className="mb-1.5 block text-sm font-medium text-foreground">Contexto máximo</label>
                       <Input type="number" min={1024} max={8192} step={1024} defaultValue={4096} />
                     </div>
                   </div>
@@ -424,7 +425,7 @@ export function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <label className="label-base mb-3 block">Tema</label>
+                  <label className="mb-3 block text-sm font-medium text-foreground">Tema</label>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {[
                       { value: "light", label: "Claro", icon: Sun },
@@ -434,7 +435,11 @@ export function SettingsPage() {
                       <button
                         key={themeOption.value}
                         type="button"
-                        onClick={() => setTheme(themeOption.value)}
+                        onClick={() =>
+                          setTheme(
+                            themeOption.value as "light" | "dark" | "system",
+                          )
+                        }
                         aria-pressed={theme === themeOption.value}
                         className={`p-4 rounded-lg border-2 text-center transition-colors ${
                           theme === themeOption.value
@@ -460,7 +465,7 @@ export function SettingsPage() {
                 </div>
 
                 <div className="border-t border-border pt-6">
-                  <label className="label-base mb-3 block">
+                  <label className="mb-3 block text-sm font-medium text-foreground">
                     Densidad de Información
                   </label>
                   <div className="grid gap-3 sm:grid-cols-3">

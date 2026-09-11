@@ -28,10 +28,12 @@ export interface Equipment {
   modality: EquipmentModality;
   brand?: EquipmentBrand;
   model?: string;
+  serialNumber?: string;
   ageYears?: number;
   quantity: number;
   confidence: number; // 0-1
   status: ObservationStatus;
+  lastSeen?: string;
   location?: {
     client: string;
     city: string;

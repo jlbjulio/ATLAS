@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useSearchParams } from "react-router-dom"
 import {
   Database,
   Download,
@@ -59,15 +60,16 @@ const QUICK_STATS = [
 ] as const
 
 const STAT_COLOR_MAP: Record<string, { bg: string; text: string }> = {
-  blue: { bg: "bg-blue-500/10", text: "text-blue-400" },
-  emerald: { bg: "bg-emerald-500/10", text: "text-emerald-400" },
-  amber: { bg: "bg-amber-500/10", text: "text-amber-400" },
-  red: { bg: "bg-red-500/10", text: "text-red-400" },
-  purple: { bg: "bg-purple-500/10", text: "text-purple-400" },
-  orange: { bg: "bg-orange-500/10", text: "text-orange-400" },
+  blue: { bg: "bg-info-soft", text: "text-info-soft-foreground" },
+  emerald: { bg: "bg-success-soft", text: "text-success-soft-foreground" },
+  amber: { bg: "bg-warning-soft", text: "text-warning-soft-foreground" },
+  red: { bg: "bg-danger-soft", text: "text-danger-soft-foreground" },
+  purple: { bg: "bg-info-soft", text: "text-info-soft-foreground" },
+  orange: { bg: "bg-warning-soft", text: "text-warning-soft-foreground" },
 }
 
 export function QueriesPage() {
+  const [searchParams] = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [showExamples, setShowExamples] = useState(false)
   const [queryError, setQueryError] = useState<string | null>(null)
@@ -130,6 +132,41 @@ export function QueriesPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    const initial = searchParams.get("q")
+    if (!initial) return
+    let active = true
+    const run = async () => {
+      setIsLoading(true)
+      setCurrentQuery(null)
+      setQueryError(null)
+      try {
+        const response = await api.search(initial)
+        const { results, filters, intent } = mapSearchResponse(response)
+        if (!active) return
+        setCurrentQuery({
+          query: initial,
+          parsedIntent: (intent as QueryIntent) ?? "UNKNOWN",
+          results,
+          filters,
+        })
+      } catch (err) {
+        console.error("Search error:", err)
+        if (active) {
+          setQueryError(
+            "ATLAS no pudo responder esta pregunta. Revisa que el backend local y QVAC estén disponibles."
+          )
+        }
+      } finally {
+        if (active) setIsLoading(false)
+      }
+    }
+    run()
+    return () => {
+      active = false
+    }
+  }, [searchParams])
 
   const handleExport = () => {
     if (!currentQuery) return
@@ -194,14 +231,15 @@ export function QueriesPage() {
             isLoading={isLoading}
             suggestions={exampleQueries}
             onSuggestionClick={handleSearch}
+            initialValue={searchParams.get("q") ?? ""}
           />
 
           {queryError && (
             <div
-              className="flex items-start gap-3 rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-400"
+              className="flex items-start gap-3 rounded-xl border border-danger-soft-foreground/25 bg-danger-soft px-4 py-3 text-sm text-danger-soft-foreground"
               role="alert"
             >
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
               <span>{queryError}</span>
             </div>
           )}
@@ -248,7 +286,7 @@ export function QueriesPage() {
           {currentQuery && (
             <div className="space-y-3">
               <div className="flex justify-end">
-                <div className="max-w-[90%] rounded-2xl rounded-br-md bg-sidebar px-4 py-3 text-sm text-sidebar-foreground shadow-sm">
+                <div className="max-w-[90%] rounded-2xl rounded-br-md bg-primary/10 px-4 py-3 text-sm text-foreground shadow-sm">
                   {currentQuery.query}
                 </div>
               </div>
@@ -375,7 +413,7 @@ export function QueriesPage() {
               </CardHeader>
               <CardContent>
                 <div className="relative">
-                  <pre className="bg-sidebar text-sidebar-foreground p-4 rounded-lg overflow-x-auto text-sm font-mono max-h-48 overflow-y-auto">
+                  <pre className="bg-neutral-soft text-foreground p-4 rounded-lg overflow-x-auto text-sm font-mono max-h-48 overflow-y-auto">
                     <code>
                       {JSON.stringify(currentQuery.filters, null, 2)}
                     </code>

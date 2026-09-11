@@ -9,10 +9,10 @@ interface MetricCardProps {
 }
 
 const colorMap = {
-  blue: "bg-blue-500/10 text-blue-400",
-  emerald: "bg-emerald-500/10 text-emerald-400",
-  amber: "bg-amber-500/10 text-amber-400",
-  orange: "bg-orange-500/10 text-orange-400",
+  blue: "bg-info-soft text-info-soft-foreground",
+  emerald: "bg-success-soft text-success-soft-foreground",
+  amber: "bg-warning-soft text-warning-soft-foreground",
+  orange: "bg-warning-soft text-warning-soft-foreground",
 }
 
 export function MetricCard({ title, value, icon, color }: MetricCardProps) {

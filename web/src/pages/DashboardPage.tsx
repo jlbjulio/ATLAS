@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import {
   Database,
   Clock,
@@ -9,10 +9,6 @@ import {
   Search,
   Mic,
   Loader2,
-  Camera,
-  MessageCircle,
-  MapPin,
-  ShieldCheck,
 } from "lucide-react"
 import {
   Card,
@@ -21,111 +17,58 @@ import {
   CardContent,
   CardDescription,
   Button,
-  PageHeader,
+  StatCard,
   EmptyState,
-  ConfidenceMeter,
+  QualityDonut,
+  EquipmentTable,
 } from "@/components/common"
 import { api, type DashboardStats } from "@/services/api"
-import { mapDashboard, mapInstalledBase } from "@/lib/mappers"
-import type { ClientInstalledBase } from "@/types"
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts"
-import { MetricCard } from "@/components/ui/metric-card"
+import { useInstalledBase } from "@/hooks/useInstalledBase"
+import { average } from "@/lib/format"
 
-interface DashboardStatsExtended extends DashboardStats {
-  by_modality: Record<string, number>
-  status_counts: Record<string, number>
+function greeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return "Buenos días"
+  if (hour < 19) return "Buenas tardes"
+  return "Buenas noches"
 }
-
-const MODALITY_COLORS = [
-  "var(--primary)",
-  "var(--accent)",
-  "var(--success)",
-  "#f59e0b",
-  "#8b5cf6",
-  "#06b6d4",
-]
-
-const STATUS_COLOR_MAP: Record<string, string> = {
-  Confirmado: "var(--success)",
-  Reportado: "var(--primary)",
-  Estimado: "var(--accent)",
-  Desconocido: "var(--muted-foreground)",
-}
-
-const FLOW_STEPS = [
-  { icon: Camera, title: "Captura", text: "Foto, voz o texto en campo." },
-  { icon: MessageCircle, title: "Comprensión", text: "Modelos locales estructuran." },
-  { icon: ShieldCheck, title: "Revisión", text: "Tú confirmas cada dato." },
-  { icon: Database, title: "Decisión", text: "Base verificable y accionable." },
-]
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const { equipments, loading: loadingBase, error } = useInstalledBase()
   const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [clients, setClients] = useState<ClientInstalledBase[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        setLoading(true)
-        const [dashboardStats, installedBase] = await Promise.all([
-          api.dashboard(),
-          api.installedBase(),
-        ])
-        setStats(mapDashboard(dashboardStats) as DashboardStatsExtended)
-        setClients(mapInstalledBase(installedBase))
-      } catch (err) {
-        setError("Error cargando el panel")
-        console.error("Dashboard load error:", err)
-      } finally {
-        setLoading(false)
-      }
+    let mounted = true
+    api
+      .dashboard()
+      .then((data) => {
+        if (mounted) setStats(data)
+      })
+      .catch((err) => console.error("Dashboard stats error:", err))
+    return () => {
+      mounted = false
     }
-    loadDashboard()
   }, [])
 
-  const allEquipments = useMemo(
-    () => clients.flatMap((c) => c.equipments),
-    [clients]
+  const quality = useMemo(
+    () => average(equipments.map((e) => e.confidence)),
+    [equipments],
   )
 
-  const avgConfidence = useMemo(() => {
-    if (allEquipments.length === 0) return 0
-    return (
-      allEquipments.reduce((sum, e) => sum + (e.confidence || 0), 0) /
-      allEquipments.length
-    )
-  }, [allEquipments])
+  const recent = useMemo(
+    () =>
+      [...equipments]
+        .sort(
+          (a, b) =>
+            new Date(b.lastSeen ?? 0).getTime() -
+            new Date(a.lastSeen ?? 0).getTime(),
+        )
+        .slice(0, 8),
+    [equipments],
+  )
 
-  const territory = useMemo(() => {
-    const map = new Map<
-      string,
-      { country: string; clients: number; equipments: number }
-    >()
-    clients.forEach((c) => {
-      const key = c.country || "Sin país"
-      const current =
-        map.get(key) ?? { country: key, clients: 0, equipments: 0 }
-      current.clients += 1
-      current.equipments += c.totalEquipmentCount
-      map.set(key, current)
-    })
-    return [...map.values()]
-      .sort((a, b) => b.equipments - a.equipments)
-      .slice(0, 5)
-  }, [clients])
-
-  if (loading) {
+  if (loadingBase) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="h-8 w-8 animate-spin text-primary-readable" />
@@ -136,154 +79,88 @@ export function DashboardPage() {
   if (error) {
     return (
       <EmptyState
-        icon={<AlertTriangle className="h-6 w-6 text-red-300" />}
-        title="Error al cargar"
+        icon={<AlertTriangle className="h-6 w-6 text-danger-soft-foreground" />}
+        title="No se pudo cargar el panel"
         description={error}
-        action={
-          <Button variant="primary" onClick={() => window.location.reload()}>
-            Reintentar
-          </Button>
-        }
       />
     )
   }
 
-  const totalEquipments = stats?.total_equipment ?? 0
-  const totalClients = stats?.total_clients ?? 0
-  const pendingConfirmations = stats?.pending_confirmations ?? 0
-  const renewalOpportunities = stats?.renewal_opportunities ?? 0
-
-  const byModality = stats?.by_modality ?? {}
-  const modalityData = Object.entries(byModality).map(([name, value]) => ({
-    name,
-    value,
-  }))
-
   const statusCounts = stats?.status_counts ?? {}
 
-  const topClients = [...clients]
-    .sort((a, b) => b.totalEquipmentCount - a.totalEquipmentCount)
-    .slice(0, 4)
-
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Installed Base Intelligence"
-        title="Inicio"
-        description="Del trabajo de campo a una decisión: la base instalada verificable, su calidad y las oportunidades de renovación."
-        actions={
-          <>
-            <Button variant="primary" onClick={() => navigate("/capture")}>
-              <Mic className="h-4 w-4" /> Nueva captura
-            </Button>
-            <Button variant="secondary" onClick={() => navigate("/queries")}>
-              <Search className="h-4 w-4" /> Consultar
-            </Button>
-          </>
-        }
-      />
-
-      <Card className="bg-card/60">
-        <CardContent className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
-          {FLOW_STEPS.map((step) => (
-            <div key={step.title} className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-primary/10 text-primary-readable">
-                <step.icon className="h-4 w-4" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  {step.title}
-                </p>
-                <p className="text-xs text-muted-foreground">{step.text}</p>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card">
+        <img
+          src="/mountains-light.webp"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover dark:hidden"
+        />
+        <img
+          src="/mountains-dark.webp"
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 hidden h-full w-full object-cover dark:block"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-card via-card/90 to-card/40 dark:from-card dark:via-card/90 dark:to-card/50" />
+        <div className="relative flex flex-col gap-6 px-6 py-8 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              {greeting()}, Usuario
+            </h1>
+            <p className="mt-1 text-lg font-medium text-foreground/90">
+              Del trabajo de campo a una decisión.
+            </p>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+              Convierte fotografías, voz y notas en una base instalada
+              verificable, mejora la calidad de tus datos y descubre
+              oportunidades de servicio y renovación.
+            </p>
+          </div>
+          <div className="hidden text-right lg:block">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-readable">
+              Field Data
+            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+              Real Impact
+            </p>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
+        <StatCard
           title="Total equipos"
-          value={totalEquipments}
-          icon={<Database className="w-5 h-5" />}
-          color="blue"
+          value={stats?.total_equipment ?? equipments.length}
+          hint="Lectura actual de la base local"
+          icon={<Database className="h-5 w-5" />}
+          accent="blue"
         />
-        <MetricCard
+        <StatCard
           title="Clientes activos"
-          value={totalClients}
-          icon={<CheckCircle className="w-5 h-5" />}
-          color="emerald"
+          value={stats?.total_clients ?? 0}
+          hint="Lectura actual de la base local"
+          icon={<CheckCircle className="h-5 w-5" />}
+          accent="emerald"
         />
-        <MetricCard
+        <StatCard
           title="Por confirmar"
-          value={pendingConfirmations}
-          icon={<Clock className="w-5 h-5" />}
-          color="amber"
+          value={stats?.pending_confirmations ?? 0}
+          hint="Equipos con datos pendientes"
+          icon={<Clock className="h-5 w-5" />}
+          accent="amber"
         />
-        <MetricCard
+        <StatCard
           title="Oportunidades de renovación"
-          value={renewalOpportunities}
-          icon={<TrendingUp className="w-5 h-5" />}
-          color="orange"
+          value={stats?.renewal_opportunities ?? 0}
+          hint="Equipos > 7 años"
+          icon={<TrendingUp className="h-5 w-5" />}
+          accent="orange"
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Top clientes por equipos</CardTitle>
-            <CardDescription>Mayor base instalada registrada</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {topClients.length > 0 ? (
-              <div className="space-y-2">
-                {topClients.map((client) => (
-                  <Link
-                    key={client.clientName}
-                    to={`/installed-base/${client.clientName}`}
-                    className="group flex items-center gap-4 rounded-lg p-3 transition-colors hover:bg-muted"
-                  >
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
-                      <Database className="h-5 w-5 text-primary-readable" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {client.clientName}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {client.city}, {client.country}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-foreground">
-                        {client.totalEquipmentCount}
-                      </p>
-                      <p className="text-xs text-primary-readable">
-                        Ver detalle
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={<Database className="h-6 w-6" />}
-                title="Sin clientes todavía"
-                description="Captura tu primera observación para poblar la base instalada."
-                action={
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => navigate("/capture")}
-                  >
-                    <Mic className="h-4 w-4" /> Nueva captura
-                  </Button>
-                }
-              />
-            )}
-          </CardContent>
-        </Card>
-
+      <div className="grid gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>Calidad de datos</CardTitle>
@@ -291,130 +168,72 @@ export function DashboardPage() {
               Puntaje explicable según completitud y evidencia
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
-            <ConfidenceMeter
-              value={avgConfidence}
-              description="Promedio de confianza de los equipos registrados."
-            />
-            <div className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Estado de observaciones
-              </p>
-              {Object.keys(statusCounts).length > 0 ? (
-                Object.entries(statusCounts).map(([label, value]) => (
-                  <div key={label} className="flex items-center gap-3">
-                    <div
-                      className="h-3 w-3 rounded"
-                      style={{
-                        backgroundColor:
-                          STATUS_COLOR_MAP[label] ?? "var(--muted-foreground)",
-                      }}
-                    />
-                    <span className="flex-1 text-sm text-muted-foreground">
-                      {label}
-                    </span>
-                    <span className="text-sm font-medium text-foreground">
-                      {value}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Aún no hay estados registrados.
-                </p>
-              )}
+          <CardContent className="flex flex-col items-center gap-5">
+            <QualityDonut value={quality} />
+            <div className="w-full space-y-2">
+              {[
+                { label: "Confirmados", value: statusCounts.Confirmado ?? 0 },
+                { label: "Reportados", value: statusCounts.Reportado ?? 0 },
+                { label: "Estimados", value: statusCounts.Estimado ?? 0 },
+                { label: "Desconocidos", value: statusCounts.Desconocido ?? 0 },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-3 text-sm">
+                  <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                  <span className="flex-1 text-muted-foreground">
+                    {item.label}
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {item.value}
+                  </span>
+                </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribución por modalidad</CardTitle>
-            <CardDescription>Equipos por tipo en la base</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {modalityData.length > 0 ? (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={modalityData}
-                    layout="vertical"
-                    margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-                  >
-                    <XAxis type="number" hide />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      tick={{ fill: "var(--muted-foreground)", fontSize: 12 }}
-                      width={80}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: "var(--card)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "var(--radius)",
-                        color: "var(--foreground)",
-                      }}
-                      cursor={{ fill: "var(--muted)" }}
-                    />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={28}>
-                      {modalityData.map((_, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={MODALITY_COLORS[index % MODALITY_COLORS.length]}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <EmptyState
-                icon={<Database className="h-6 w-6" />}
-                title="Sin distribución"
-                description="Aparecerá cuando haya equipos registrados."
-              />
-            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full"
+              onClick={() => navigate("/data-quality")}
+            >
+              Ver detalle
+            </Button>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Territory Intelligence</CardTitle>
-            <CardDescription>Equipos agregados por país</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {territory.length > 0 ? (
-              <div className="space-y-3">
-                {territory.map((row) => (
-                  <div
-                    key={row.country}
-                    className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2"
-                  >
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="flex-1 text-sm text-foreground">
-                      {row.country}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {row.clients} clientes
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">
-                      {row.equipments}
-                    </span>
-                  </div>
-                ))}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle>Equipos recientes</CardTitle>
+                <CardDescription>
+                  Últimas observaciones procesadas
+                </CardDescription>
               </div>
-            ) : (
-              <EmptyState
-                icon={<MapPin className="h-6 w-6" />}
-                title="Sin datos geográficos"
-                description="Registra clientes con ciudad y país para ver el agregado."
-              />
-            )}
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate("/queries")}
+                >
+                  <Search className="h-4 w-4" /> Consultar
+                </Button>
+                <Button size="sm" onClick={() => navigate("/capture")}>
+                  <Mic className="h-4 w-4" /> Nueva captura
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-2 sm:p-4">
+            <EquipmentTable
+              data={recent}
+              pageSize={8}
+              emptyTitle="Sin equipos todavía"
+              emptyDescription="Captura tu primera observación para poblar la base."
+              emptyAction={
+                <Button variant="primary" onClick={() => navigate("/capture")}>
+                  <Mic className="h-4 w-4" /> Nueva captura
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
       </div>

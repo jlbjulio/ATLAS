@@ -351,11 +351,11 @@ export function ObservationForm({
                 </Button>
               </div>
             </div>
-            <p className={`mt-2 text-xs ${voiceError ? "text-red-300" : "text-muted-foreground"}`} role={voiceError ? "alert" : "status"}>
+            <p className={`mt-2 text-xs ${voiceError ? "text-danger-soft-foreground" : "text-muted-foreground"}`} role={voiceError ? "alert" : "status"}>
               {voiceStatus}
             </p>
             {errors.rawText && (
-              <p className="mt-1 text-sm text-red-300" role="alert">
+              <p className="mt-1 text-sm text-danger-soft-foreground" role="alert">
                 {errors.rawText}
               </p>
             )}

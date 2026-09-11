@@ -17,19 +17,19 @@ export function NextBestQuestion({
   return (
     <div
       className={cn(
-        "rounded-lg border border-amber-500/30 bg-amber-500/10 p-4",
+        "rounded-lg border border-warning-soft-foreground/25 bg-warning-soft p-4",
         className,
       )}
       role="status"
     >
-      <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-200">
+      <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold text-warning-soft-foreground">
         <AlertTriangle className="h-4 w-4" />
         Un dato más para completar el registro
       </h4>
-      <p className="mb-2 text-xs text-amber-100/80">
+      <p className="mb-2 text-xs text-warning-soft-foreground/80">
         ATLAS pregunta solo por lo que más aporta a la confianza del registro.
       </p>
-      <ul className="list-inside list-disc space-y-1 text-sm text-amber-100/90">
+      <ul className="list-inside list-disc space-y-1 text-sm text-warning-soft-foreground">
         {followUpQuestions.map((q, i) => (
           <li key={`q-${i}`}>{q}</li>
         ))}

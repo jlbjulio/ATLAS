@@ -19,15 +19,15 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const VARIANT_CLASSES: Record<BadgeVariant, string> = {
-  confirmed: "bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-500/30",
-  success: "bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-500/30",
-  reported: "bg-sky-500/15 text-sky-300 ring-1 ring-inset ring-sky-500/30",
-  info: "bg-sky-500/15 text-sky-300 ring-1 ring-inset ring-sky-500/30",
-  estimated: "bg-amber-500/15 text-amber-300 ring-1 ring-inset ring-amber-500/30",
-  warning: "bg-amber-500/15 text-amber-300 ring-1 ring-inset ring-amber-500/30",
-  danger: "bg-red-500/15 text-red-300 ring-1 ring-inset ring-red-500/30",
-  unknown: "bg-muted text-muted-foreground ring-1 ring-inset ring-border",
-  default: "bg-secondary text-secondary-foreground ring-1 ring-inset ring-border",
+  confirmed: "bg-success-soft text-success-soft-foreground",
+  success: "bg-success-soft text-success-soft-foreground",
+  reported: "bg-info-soft text-info-soft-foreground",
+  info: "bg-info-soft text-info-soft-foreground",
+  estimated: "bg-warning-soft text-warning-soft-foreground",
+  warning: "bg-warning-soft text-warning-soft-foreground",
+  danger: "bg-danger-soft text-danger-soft-foreground",
+  unknown: "bg-neutral-soft text-neutral-soft-foreground",
+  default: "bg-secondary text-secondary-foreground",
 }
 
 const SIZE_CLASSES = {

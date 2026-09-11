@@ -1,14 +1,14 @@
 import { Outlet } from "react-router-dom"
-import { Header } from "./Header"
 import { Sidebar } from "./Sidebar"
+import { TopBar } from "./TopBar"
 
 export function MainLayout() {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <Header />
       <div className="lg:pl-64">
-        <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <TopBar />
+        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />
         </main>
       </div>

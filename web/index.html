@@ -11,6 +11,20 @@
       content="ATLAS · Installed Base Intelligence — convierte fotos, voz y notas de campo en una base instalada verificable, local y accionable."
     />
     <title>ATLAS · Installed Base Intelligence</title>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("atlas-theme") || "light";
+          var dark =
+            stored === "dark" ||
+            (stored === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var root = document.documentElement;
+          if (dark) root.classList.add("dark");
+          root.style.colorScheme = dark ? "dark" : "light";
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">

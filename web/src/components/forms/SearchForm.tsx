@@ -14,6 +14,7 @@ interface SearchFormProps {
   placeholder?: string
   suggestions?: string[]
   onSuggestionClick?: (suggestion: string) => void
+  initialValue?: string
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -31,8 +32,9 @@ export function SearchForm({
   placeholder = "Consulta en lenguaje natural...",
   suggestions = [],
   onSuggestionClick,
+  initialValue = "",
 }: SearchFormProps) {
-  const [query, setQuery] = useState("")
+  const [query, setQuery] = useState(initialValue)
   const [showSuggestions, setShowSuggestions] = useState(false)
 
   const handleSubmit = async (e: FormEvent) => {

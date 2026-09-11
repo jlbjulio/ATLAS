@@ -120,16 +120,16 @@ export function CapturePage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <section className="relative overflow-hidden rounded-xl border border-sidebar-border bg-sidebar px-6 py-7 text-sidebar-foreground shadow-sm sm:px-8">
-        <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border border-cyan-400/20 bg-cyan-400/5 blur-2xl" />
+      <section className="relative overflow-hidden rounded-xl border border-border bg-card px-6 py-7 shadow-sm sm:px-8">
+        <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border border-primary/20 bg-primary/5 blur-2xl" />
         <div className="relative max-w-2xl">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-400">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary-readable">
             Captura inteligente · operación local
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight text-sidebar-foreground sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             De la evidencia del campo a una decisión.
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-sidebar-foreground/80">
+          <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
             Captura una nota, voz o placa autorizada. ATLAS estructura la
             observación para que puedas revisarla antes de incorporarla a la
             base instalada.
@@ -143,9 +143,9 @@ export function CapturePage() {
             ].map(([Icon, label]) => (
               <div
                 key={label as string}
-                className="flex items-center gap-2 text-xs text-sidebar-foreground/80"
+                className="flex items-center gap-2 text-xs text-muted-foreground"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-400/10 text-cyan-300">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-primary/10 text-primary-readable">
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="hidden sm:inline">{label as string}</span>
@@ -157,29 +157,29 @@ export function CapturePage() {
 
       {initError && (
         <div
-          className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          className="flex items-start gap-3 rounded-lg border border-danger-soft-foreground/25 bg-danger-soft px-4 py-3 text-sm text-danger-soft-foreground"
           role="alert"
         >
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <p className="font-medium">Error al inicializar QVAC</p>
-            <p className="text-red-200/80">{initError}</p>
+            <p className="opacity-80">{initError}</p>
           </div>
         </div>
       )}
 
       <div
-        className="flex items-start gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+        className="flex items-start gap-3 rounded-lg border border-success-soft-foreground/25 bg-success-soft px-4 py-3 text-sm text-success-soft-foreground"
         role="status"
       >
-        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
+        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
         <div>
           <p className="font-medium">
             {isInitialized
               ? "QVAC local verificado"
               : "Procesamiento local disponible"}
           </p>
-          <p className="text-emerald-200/80">
+          <p className="opacity-80">
             {isInitialized
               ? "La inferencia de esta captura se ejecutará en el dispositivo."
               : "La verificación de QVAC se realizará al analizar la observación."}
@@ -194,10 +194,10 @@ export function CapturePage() {
 
       {draftSaved && !showSuccess && (
         <div
-          className="flex items-center gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+          className="flex items-center gap-3 rounded-lg border border-success-soft-foreground/25 bg-success-soft px-4 py-3 text-sm text-success-soft-foreground"
           role="status"
         >
-          <CheckCircle className="h-4 w-4 shrink-0 text-emerald-300" />
+          <CheckCircle className="h-4 w-4 shrink-0" />
           Borrador guardado localmente. Revisa los cambios y confirma para
           incorporarlo a la base instalada.
         </div>
@@ -205,10 +205,10 @@ export function CapturePage() {
 
       {actionError && (
         <div
-          className="flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          className="flex items-center gap-3 rounded-lg border border-danger-soft-foreground/25 bg-danger-soft px-4 py-3 text-sm text-danger-soft-foreground"
           role="alert"
         >
-          <AlertTriangle className="h-5 w-5 shrink-0 text-red-300" />
+          <AlertTriangle className="h-5 w-5 shrink-0" />
           <p>{actionError}</p>
         </div>
       )}
@@ -306,8 +306,8 @@ export function CapturePage() {
           size="sm"
         >
           <div className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15">
-              <CheckCircle className="h-8 w-8 text-emerald-300" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success-soft">
+              <CheckCircle className="h-8 w-8 text-success-soft-foreground" />
             </div>
             <h3 className="mb-2 text-lg font-medium text-foreground">
               Observación registrada correctamente
