@@ -38,3 +38,26 @@ AGENTS.md
 
 # Local Remotion video project (not shared)
 video/
+
+# IDE / editor
+.idea/
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Local agent tooling (not shared)
+.claude/
+.opencode/
+
+# Python caches and coverage
+.mypy_cache/
+.coverage
+htmlcov/
