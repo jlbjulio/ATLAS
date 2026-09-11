@@ -22,6 +22,7 @@ import {
   QualityDonut,
   EquipmentTable,
 } from "@/components/common"
+import { SharedPowerCard } from "@/components/shared/SharedPowerCard"
 import { api, type DashboardStats } from "@/services/api"
 import { useInstalledBase } from "@/hooks/useInstalledBase"
 import { average } from "@/lib/format"
@@ -159,6 +160,8 @@ export function DashboardPage() {
           accent="orange"
         />
       </div>
+
+      <SharedPowerCard />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card>

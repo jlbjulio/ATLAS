@@ -9,7 +9,7 @@ import type {
   TranscribeResponse,
   SearchResponse,
   SearchResult,
-} from '@/services/api';
+} from "@/services/api";
 
 import type {
   EquipmentModality,
@@ -17,17 +17,22 @@ import type {
   ObservationStatus,
   ClientInstalledBase,
   QVACExtractionResult,
-} from '@/types';
+} from "@/types";
 
 export function mapHealth(response: HealthResponse) {
-  const requiredModels = ['qwen3-0.6b', 'whisper-small', 'silero-vad'];
+  const requiredModels = ["qwen3-0.6b", "whisper-small", "silero-vad"];
   return {
-    available: response.local_only && requiredModels.every((model) => response.models_exist[model]),
+    available:
+      response.local_only &&
+      requiredModels.every((model) => response.models_exist[model]),
     models: response.models_exist,
+    extractionMode: response.extraction_mode,
   };
 }
 
-export function mapInstalledBase(clients: InstalledBaseClient[]): ClientInstalledBase[] {
+export function mapInstalledBase(
+  clients: InstalledBaseClient[],
+): ClientInstalledBase[] {
   return clients.map((client) => ({
     clientId: client.id,
     clientName: client.name,
@@ -44,7 +49,9 @@ export function mapInstalledBase(clients: InstalledBaseClient[]): ClientInstalle
     })),
     lastVisit: client.last_observed,
     totalEquipmentCount: client.reported_units,
-    renewalOpportunities: client.assets.filter((asset) => (asset.age_years ?? 0) > 7).length,
+    renewalOpportunities: client.assets.filter(
+      (asset) => (asset.age_years ?? 0) > 7,
+    ).length,
   }));
 }
 
@@ -54,37 +61,62 @@ export function mapDashboard(stats: DashboardStats) {
 
 function mapStatus(status: string): ObservationStatus {
   const map: Record<string, ObservationStatus> = {
-    Confirmado: 'CONFIRMED',
-    Reportado: 'REPORTED',
-    Estimado: 'ESTIMATED',
-    Desconocido: 'UNKNOWN',
+    Confirmado: "CONFIRMED",
+    Reportado: "REPORTED",
+    Estimado: "ESTIMATED",
+    Desconocido: "UNKNOWN",
   };
-  return map[status] ?? 'UNKNOWN';
+  return map[status] ?? "UNKNOWN";
 }
 
-function mapStatusToSpanish(status: ObservationStatus): 'Confirmado' | 'Reportado' | 'Estimado' | 'Desconocido' {
-  const map: Record<ObservationStatus, 'Confirmado' | 'Reportado' | 'Estimado' | 'Desconocido'> = {
-    CONFIRMED: 'Confirmado',
-    REPORTED: 'Reportado',
-    ESTIMATED: 'Estimado',
-    UNKNOWN: 'Desconocido',
+function mapStatusToSpanish(
+  status: ObservationStatus,
+): "Confirmado" | "Reportado" | "Estimado" | "Desconocido" {
+  const map: Record<
+    ObservationStatus,
+    "Confirmado" | "Reportado" | "Estimado" | "Desconocido"
+  > = {
+    CONFIRMED: "Confirmado",
+    REPORTED: "Reportado",
+    ESTIMATED: "Estimado",
+    UNKNOWN: "Desconocido",
   };
   return map[status];
 }
 
 function mapModality(modality: string | null): EquipmentModality {
   const valid: EquipmentModality[] = [
-    'MRI', 'CT', 'XRAY', 'ULTRASOUND', 'PET', 'SPECT', 'MAMMOGRAPHY', 'FLUOROSCOPY', 'OTHER'
+    "MRI",
+    "CT",
+    "XRAY",
+    "ULTRASOUND",
+    "PET",
+    "SPECT",
+    "MAMMOGRAPHY",
+    "FLUOROSCOPY",
+    "OTHER",
   ];
-  return (valid.includes(modality as EquipmentModality) ? modality : 'OTHER') as EquipmentModality;
+  return (
+    valid.includes(modality as EquipmentModality) ? modality : "OTHER"
+  ) as EquipmentModality;
 }
 
 function mapBrand(brand: string | null): EquipmentBrand | undefined {
   const valid: EquipmentBrand[] = [
-    'PHILIPS', 'SIEMENS', 'GE', 'CANON', 'HITACHI', 'FUJIFILM', 'SAMSUNG', 'MINDRAY', 'OTHER'
+    "PHILIPS",
+    "SIEMENS",
+    "GE",
+    "CANON",
+    "HITACHI",
+    "FUJIFILM",
+    "SAMSUNG",
+    "MINDRAY",
+    "OTHER",
   ];
   if (!brand) return undefined;
-  return valid.includes(brand as EquipmentBrand) ? (brand as EquipmentBrand) : undefined;
+  return valid.includes(brand as EquipmentBrand)
+    ? (brand as EquipmentBrand)
+    : undefined;
 }
 
 export function mapEquipment(e: CoreEquipment) {
@@ -102,7 +134,7 @@ export function mapEquipment(e: CoreEquipment) {
     lastSeen: undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    sourceObservationId: '',
+    sourceObservationId: "",
   };
 }
 
@@ -116,18 +148,25 @@ export function mapEvidence(e: Evidence) {
   };
 }
 
-export function mapObservationDraft(draft: ObservationDraft): QVACExtractionResult {
+export function mapObservationDraft(
+  draft: ObservationDraft,
+): QVACExtractionResult {
   return {
     equipments: draft.equipment.map(mapEquipment),
-    confidence: draft.equipment.length > 0
-      ? draft.equipment.reduce((sum, e) => sum + (e.confidence ?? 0), 0) / draft.equipment.length
-      : 0,
+    confidence:
+      draft.equipment.length > 0
+        ? draft.equipment.reduce((sum, e) => sum + (e.confidence ?? 0), 0) /
+          draft.equipment.length
+        : 0,
     missingFields: draft.missing_fields,
     followUpQuestions: draft.next_question ? [draft.next_question] : [],
+    draft,
   };
 }
 
-export function mapExtractionResponse(response: ExtractResponse): QVACExtractionResult {
+export function mapExtractionResponse(
+  response: ExtractResponse,
+): QVACExtractionResult {
   return mapObservationDraft(response.draft);
 }
 
@@ -135,7 +174,9 @@ export function mapTranscribeResponse(response: TranscribeResponse): string {
   return response.text;
 }
 
-export function mapSearchResults(results: SearchResult[]): ClientInstalledBase[] {
+export function mapSearchResults(
+  results: SearchResult[],
+): ClientInstalledBase[] {
   const clientMap = new Map<string, ClientInstalledBase>();
 
   for (const r of results) {
@@ -172,10 +213,12 @@ export function mapSearchResults(results: SearchResult[]): ClientInstalledBase[]
       },
       createdAt: r.first_seen,
       updatedAt: r.last_seen,
-      sourceObservationId: '',
+      sourceObservationId: "",
     });
     client.totalEquipmentCount = client.equipments.length;
-    client.renewalOpportunities = client.equipments.filter(e => e.ageYears && e.ageYears > 7).length;
+    client.renewalOpportunities = client.equipments.filter(
+      (e) => e.ageYears && e.ageYears > 7,
+    ).length;
   }
 
   return Array.from(clientMap.values());
@@ -194,12 +237,19 @@ export function mapSearchResponse(response: SearchResponse): {
 }
 
 export function toCoreDraft(
-  formData: { rawText: string; clientName?: string; city?: string; country?: string; audioUri?: string; imageUris?: string[] },
-  extraction: QVACExtractionResult
+  formData: {
+    rawText: string;
+    clientName?: string;
+    city?: string;
+    country?: string;
+    audioUri?: string;
+  },
+  extraction: QVACExtractionResult,
 ): ObservationDraft {
-  const now = new Date().toISOString().split('T')[0];
+  const now = new Date().toISOString().split("T")[0];
 
   return {
+    ...extraction.draft,
     client: formData.clientName ?? null,
     city: formData.city ?? null,
     country: formData.country ?? null,
@@ -212,20 +262,20 @@ export function toCoreDraft(
       model: eq.model ?? null,
       serial_number: null,
       age_years: eq.ageYears ?? null,
-      installation_year: eq.ageYears ? new Date().getFullYear() - eq.ageYears : null,
+      installation_year: eq.ageYears
+        ? new Date().getFullYear() - eq.ageYears
+        : null,
       status: mapStatusToSpanish(eq.status),
       confidence: eq.confidence,
-      evidence_text: '',
+      evidence_text: "",
       notes: null,
     })),
-    source: formData.audioUri ? 'Voice' : 'Text',
+    source: extraction.draft.source,
     visit_date: now,
-    observer: 'web-user',
-    // Browser object URLs are not durable evidence paths. Require a reviewed
-    // local-photo pipeline before allowing them into the confirmed record.
-    evidence: [],
+    observer: "web-user",
+    evidence: extraction.draft.evidence,
     missing_fields: extraction.missingFields,
     next_question: extraction.followUpQuestions[0] ?? null,
-    privacy_flags: formData.imageUris?.length ? ['photo_review_required'] : [],
+    privacy_flags: extraction.draft.privacy_flags,
   };
 }

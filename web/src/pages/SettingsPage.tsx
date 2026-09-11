@@ -277,43 +277,27 @@ export function SettingsPage() {
                 <div className="border-t border-border pt-6">
                   <div className="mb-4 flex items-center gap-3">
                     <h4 className="font-medium text-foreground">
-                      P2P / Delegated Inference
+                      Potencia compartida
                     </h4>
-                    <Badge variant="info">Móvil / roadmap</Badge>
+                    <Badge variant="info">Activo</Badge>
                   </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        id="p2p-enabled"
-                        className="w-4 h-4 rounded border-input text-primary focus:ring-ring"
-                      />
-                      <label htmlFor="p2p-enabled" className="text-sm text-muted-foreground">
-                        Habilitar inferencia delegada P2P (laptop como proveedor)
-                      </label>
-                    </div>
-                    <Input
-                      label="Provider Public Key (laptop)"
-                      placeholder="Ed25519 public key from laptop"
-                      helperText="Clave pública del proveedor QVAC en la laptop del hospital"
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Desde el dashboard puedes compartir el procesador de esta laptop con el móvil. El móvil escanea un código QR y ATLAS delega automáticamente texto y audio a la laptop, con fallback local si la conexión falla.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="fallback-local"
+                      defaultChecked
+                      disabled
+                      className="w-4 h-4 rounded border-input text-primary focus:ring-ring"
                     />
-                    <Input
-                      label="Fallback Timeout (ms)"
-                      type="number"
-                      defaultValue={30000}
-                      helperText="Tiempo antes de caer a inferencia local si el peer no responde"
-                    />
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        id="fallback-local"
-                        defaultChecked
-                        className="w-4 h-4 rounded border-input text-primary focus:ring-ring"
-                      />
-                      <label htmlFor="fallback-local" className="text-sm text-muted-foreground">
-                        Fallback a inferencia local automático (recomendado para robustez offline)
-                      </label>
-                    </div>
+                    <label
+                      htmlFor="fallback-local"
+                      className="text-sm text-muted-foreground"
+                    >
+                      Fallback a inferencia local automático
+                    </label>
                   </div>
                 </div>
               </CardContent>

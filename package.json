@@ -11,10 +11,10 @@
     "train:evaluate": "tsx training/evaluate_adapter.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests && python -m pytest -q",
+    "test": "vitest run --passWithNoTests && node tools/run-python.js -m pytest -q",
     "web:check": "npm --prefix web run typecheck && npm --prefix web run lint && npm --prefix web run build",
     "format:check": "prettier --check package.json tsconfig.json \".github/**/*.yml\" \"tools/**/*.js\"",
-    "check": "npm run lint && npm run typecheck && npm run format:check && npm run web:check && python -m ruff check . && npm test"
+    "check": "npm run lint && npm run typecheck && npm run format:check && npm run web:check && node tools/run-python.js -m ruff check . && npm test"
   },
   "dependencies": {
     "@qvac/sdk": "0.19.0"

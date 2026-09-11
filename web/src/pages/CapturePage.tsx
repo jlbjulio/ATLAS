@@ -29,27 +29,21 @@ import type { QVACExtractionResult, CaptureFormData } from "@/types"
 
 export function CapturePage() {
   const navigate = useNavigate()
-  const { createObservation, confirmObservation } = useObservations()
+  const { confirmDraft } = useObservations()
   const { initialize, extract, transcribe, isInitialized, initError } =
     useQVAC()
   const [extractionResult, setExtractionResult] =
     useState<QVACExtractionResult | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isConfirming, setIsConfirming] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
-  const [draftSaved, setDraftSaved] = useState(false)
   const [formInstance, setFormInstance] = useState(0)
-  const [lastFormData, setLastFormData] = useState<CaptureFormData | null>(
-    null
-  )
-  const [lastExtraction, setLastExtraction] =
-    useState<QVACExtractionResult | null>(null)
+  const [lastFormData, setLastFormData] = useState<CaptureFormData | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const currentStep = draftSaved ? 2 : extractionResult ? 1 : 0
+  const currentStep = showSuccess ? 2 : extractionResult ? 1 : 0
 
   const handleExtract = async (
-    formData: CaptureFormData
+    formData: CaptureFormData,
   ): Promise<QVACExtractionResult> => {
     setActionError(null)
     if (!isInitialized) {
@@ -58,58 +52,38 @@ export function CapturePage() {
     const result = await extract(formData)
     setExtractionResult(result)
     setLastFormData(formData)
-    setLastExtraction(result)
     return result
   }
 
   const handleSubmit = async (
     formData: CaptureFormData,
-    extraction: QVACExtractionResult
+    extraction: QVACExtractionResult,
   ) => {
     setActionError(null)
     setIsSubmitting(true)
     try {
-      await createObservation(
-        formData,
-        extraction,
-        "user-demo",
-        "Usuario Demo"
-      )
+      if (extraction.draft.privacy_flags.length > 0) {
+        setActionError(
+          "La detección local identificó contenido sensible. Retira o redacta la foto antes de confirmar.",
+        )
+        return
+      }
+      await confirmDraft(formData, extraction)
       setLastFormData(formData)
-      setLastExtraction(extraction)
-      setDraftSaved(true)
-    } catch (error) {
-      console.error("Error al guardar la observación:", error)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleConfirm = async () => {
-    if (!lastFormData || !lastExtraction) return
-    setActionError(null)
-    if (lastFormData.imageUris?.length) {
-      setActionError(
-        "Revisa o retira las fotos antes de confirmar. No se admiten pacientes, expedientes, gafetes ni rostros."
-      )
-      return
-    }
-    setIsConfirming(true)
-    try {
-      await confirmObservation("temp", lastFormData, lastExtraction)
       setShowSuccess(true)
     } catch (error) {
-      console.error("Error confirming observation:", error)
+      console.error("Error al guardar la observación:", error)
+      setActionError(
+        "No se pudo confirmar la observación. Revisa los datos e inténtalo de nuevo.",
+      )
     } finally {
-      setIsConfirming(false)
+      setIsSubmitting(false)
     }
   }
 
   const handleReset = () => {
     setExtractionResult(null)
     setLastFormData(null)
-    setLastExtraction(null)
-    setDraftSaved(false)
     setShowSuccess(false)
     setFormInstance((instance) => instance + 1)
   }
@@ -192,17 +166,6 @@ export function CapturePage() {
         current={currentStep}
       />
 
-      {draftSaved && !showSuccess && (
-        <div
-          className="flex items-center gap-3 rounded-lg border border-success-soft-foreground/25 bg-success-soft px-4 py-3 text-sm text-success-soft-foreground"
-          role="status"
-        >
-          <CheckCircle className="h-4 w-4 shrink-0" />
-          Borrador guardado localmente. Revisa los cambios y confirma para
-          incorporarlo a la base instalada.
-        </div>
-      )}
-
       {actionError && (
         <div
           className="flex items-center gap-3 rounded-lg border border-danger-soft-foreground/25 bg-danger-soft px-4 py-3 text-sm text-danger-soft-foreground"
@@ -223,7 +186,6 @@ export function CapturePage() {
         onCancel={handleNewCapture}
         onExtractionChange={(result) => {
           setExtractionResult(result)
-          setLastExtraction(result)
         }}
       />
 
@@ -276,23 +238,14 @@ export function CapturePage() {
 
             <EvidenceOrigin
               observerName="Usuario Demo"
-              imageCount={lastFormData?.imageUris?.length ?? 0}
+              imageCount={lastFormData?.photo ? 1 : 0}
               hasAudio={Boolean(lastFormData?.audioUri)}
               synced={false}
             />
 
-            <div className="flex flex-wrap gap-3 border-t border-border pt-4">
-              <Button
-                variant="primary"
-                onClick={handleConfirm}
-                loading={isConfirming}
-              >
-                <CheckCircle className="h-4 w-4" />
-                Confirmar e incorporar
-              </Button>
-              <Button variant="secondary" onClick={handleNewCapture}>
-                Nueva captura
-              </Button>
+            <div className="text-sm text-muted-foreground">
+              Revisa los campos en el formulario y confirma el registro desde el
+              botón principal.
             </div>
           </CardContent>
         </Card>

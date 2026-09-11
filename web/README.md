@@ -2,6 +2,8 @@
 
 Dashboard web para **Inteligencia de Base Instalada** — Philips Hackathon.
 
+Para preparar una demostración completa, incluidos modelos locales, seed y guion de captura, sigue el [runbook de demo](../DEMO_RUNBOOK.md).
+
 **Stack:** React 18 + TypeScript + Vite + Tailwind CSS + Zustand + React Router 6
 
 ---
@@ -30,12 +32,12 @@ npm run preview
 ### Backend (requerido)
 
 ```bash
-# Desde la raiz del repo
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r python-requirements.txt
+# Desde la raíz del repo
+python3 -m venv .venv
+.venv/bin/python -m pip install -e . pytest==8.3.2 ruff==0.12.11 httpx==0.28.1
 
 # Iniciar backend
-python -m uvicorn web.server.main:app --reload --port 8000
+.venv/bin/python -m uvicorn web.server.main:app --reload --host 127.0.0.1 --port 8000
 # -> http://localhost:8000/api/health
 ```
 
@@ -123,6 +125,7 @@ npm run check        # typecheck + lint + format
 
 - Sin API keys ni tokens hardcoded.
 - Sin envios a servicios externos (inferencia 100% local via QVAC).
-- Fotos de pacientes/expedientes/gafetes bloquean la confirmacion.
+- Una foto requiere autorización explícita antes de ejecutarse con VisionPsy local.
+- Fotos con indicadores de pacientes, expedientes, gafetes o rostros bloquean la confirmación.
 - `.env` excluido de git via `.gitignore`.
 - Errores visibles en UI sin exponer datos sensibles.

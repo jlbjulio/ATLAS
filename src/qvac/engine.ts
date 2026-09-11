@@ -17,7 +17,7 @@ import type { PerformanceRecord, StructuredObservation } from "./types.js";
 
 type ModelSpec = {
   path: string;
-  lora_path?: string;
+  optional_lora_path?: string;
   projector_path?: string;
   quantization?: string;
   qvac_model_type: string;
@@ -105,13 +105,16 @@ async function structuredCompletion(
   const loadStarted = performance.now();
   let modelId: string | undefined;
   try {
-    if (spec.lora_path) {
+    const adapterPath = spec.optional_lora_path
+      ? localPath(spec.optional_lora_path)
+      : undefined;
+    let adapterAvailable = false;
+    if (adapterPath) {
       try {
-        await access(localPath(spec.lora_path));
+        await access(adapterPath);
+        adapterAvailable = true;
       } catch {
-        throw new Error(
-          `Required ATLAS LoRA adapter is missing: ${localPath(spec.lora_path)}. Run python training/train_lora.py.`,
-        );
+        // The evaluated adapter is optional; the verified base model remains demo-ready.
       }
     }
     modelId = await loadModel({
@@ -119,7 +122,7 @@ async function structuredCompletion(
       modelType: "llamacpp-completion",
       modelConfig: {
         ctx_size: 4096,
-        ...(spec.lora_path ? { lora: localPath(spec.lora_path) } : {}),
+        ...(adapterAvailable && adapterPath ? { lora: adapterPath } : {}),
         ...(spec.projector_path
           ? { projectionModelSrc: localPath(spec.projector_path) }
           : {}),
@@ -134,9 +137,7 @@ async function structuredCompletion(
         {
           role: "user",
           content: prompt,
-          ...(imagePath
-            ? { attachments: [{ path: resolve(imagePath) }] }
-            : {}),
+          ...(imagePath ? { attachments: [{ path: resolve(imagePath) }] } : {}),
         },
       ],
       stream: true,
@@ -166,9 +167,12 @@ async function structuredCompletion(
     metric.tokens_per_second = final.stats?.tokensPerSecond ?? 0;
     const output = final.contentText.trim() || final.raw.fullText.trim();
     if (!output) throw new Error("QVAC returned an empty structured response");
-    const parsed = normalizeObservation(JSON.parse(output) as StructuredObservation, {
-      hasImage: Boolean(imagePath),
-    });
+    const parsed = normalizeObservation(
+      JSON.parse(output) as StructuredObservation,
+      {
+        hasImage: Boolean(imagePath),
+      },
+    );
     metric.success = true;
     return parsed;
   } catch (error) {
@@ -181,7 +185,11 @@ async function structuredCompletion(
 }
 
 export function extractText(note: string): Promise<StructuredObservation> {
-  return structuredCompletion(config.models.extraction, "text-extraction", note);
+  return structuredCompletion(
+    config.models.extraction,
+    "text-extraction",
+    note,
+  );
 }
 
 export function inspectEquipmentPhoto(
@@ -198,7 +206,12 @@ export function inspectEquipmentPhoto(
 
 export async function transcribeAudio(audioPath: string): Promise<string> {
   const spec = config.models.transcription;
-  const metric = baseMetric(spec.path, "Q8_0", "voice-transcription", audioPath);
+  const metric = baseMetric(
+    spec.path,
+    "Q8_0",
+    "voice-transcription",
+    audioPath,
+  );
   const loadStarted = performance.now();
   let modelId: string | undefined;
   try {
@@ -227,7 +240,12 @@ export async function transcribeAudio(audioPath: string): Promise<string> {
 
 export async function embedIdentity(text: string): Promise<number[]> {
   const spec = config.models.duplicates;
-  const metric = baseMetric(spec.path, spec.quantization ?? "Q8_0", "asset-embedding", text);
+  const metric = baseMetric(
+    spec.path,
+    spec.quantization ?? "Q8_0",
+    "asset-embedding",
+    text,
+  );
   const loadStarted = performance.now();
   let modelId: string | undefined;
   try {
