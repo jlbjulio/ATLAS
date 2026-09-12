@@ -1,106 +1,125 @@
 # ATLAS | Installed Base Intelligence
 
-ATLAS convierte fotografías, voz y notas de campo en una base instalada verificable y accionable. Procesa la información directamente en el dispositivo, funciona sin conexión y transforma observaciones incompletas en mejores decisiones de servicio, planificación y renovación.
+ATLAS turns field observations, equipment photos, and spoken notes into a reliable, actionable view of a customer's installed base. It runs inference directly on local hardware, remains useful without connectivity, and converts incomplete observations into structured records for service, planning, and renewal decisions.
 
-## Del trabajo de campo a una decisión
+## From observation to decision
 
 ```text
-Fotografía autorizada + voz o texto
-→ comprensión multimodal local
-→ registro estructurado con evidencia
-→ pregunta por el dato de mayor valor
-→ revisión humana
-→ historial auditable y sincronización local
-→ Customer 360 y calidad de datos
+Authorized photo + voice or text
+→ local multimodal understanding
+→ structured record with supporting evidence
+→ highest-value follow-up question
+→ human confirmation
+→ auditable history and local synchronization
+→ Customer 360 and data-quality insights
 ```
 
-Una captura puede producir varios registros cuando se observan equipos de diferentes modalidades, marcas, modelos o edades. ATLAS conserva los valores desconocidos, nunca fusiona activos automáticamente y permite rastrear cada dato hasta su evidencia original.
+A single capture can create multiple records when different modalities, manufacturers, models, or asset ages are observed. ATLAS preserves unknown values, never merges assets automatically, and keeps every field traceable to its original evidence.
 
-## Capacidades del MVP
+## Capabilities
 
-- **Smart Capture:** captura mediante fotografía, voz o texto aun sin conexión.
-- **Asset Identity:** cliente, ubicación, modalidad, cantidad, fabricante, modelo, serie y antigüedad.
-- **Next Best Question:** pregunta únicamente por el dato faltante que más valor aporta.
-- **Confidence Engine:** puntaje explicable según completitud y evidencia.
-- **Customer 360:** base instalada por cliente con última observación y calidad de datos.
-- **Evidence Ledger:** evidencia, campos confirmados y trazabilidad hasta la captura original.
-- **Offline Outbox:** guardado local inmediato en SQLite con sincronización manual/exportable.
-- **Potencia compartida (P2P):** la laptop actúa como proveedor de inferencia para el celular vía QR en la red local, con lista de dispositivos enlazados.
-- **Visión local en el celular:** captura de placas y etiquetas con VisionPsy Nano en el dispositivo.
-- **Sincronización al celular:** la cola local de observaciones se envía a la laptop emparejada.
+- **Smart Capture:** collect observations through photos, voice, or text without requiring connectivity.
+- **Asset Identity:** structure customer, location, modality, quantity, manufacturer, model, serial number, installation year, and estimated age.
+- **Next Best Question:** request the missing field that would add the most value to the record.
+- **Confidence Engine:** calculate an explainable score from completeness, evidence quality, recency, and independent confirmation.
+- **Duplicate Intelligence:** identify likely duplicate or conflicting observations while preserving the originals.
+- **Customer 360:** inspect installed equipment, latest observations, verification status, and data quality by customer.
+- **Territory Intelligence:** aggregate modalities, manufacturers, age, and verification quality across locations.
+- **Opportunity Radar:** surface aging or insufficiently verified assets that may require review.
+- **Evidence Ledger:** trace confirmed fields and changes back to their source capture.
+- **Offline Outbox:** persist work immediately in SQLite and synchronize idempotent events when a connection becomes available.
+- **Shared Compute:** pair a phone with a laptop over the local network and delegate inference through a QR-based connection.
+- **On-device Vision:** inspect authorized equipment labels and nameplates with VisionPsy Nano.
 
-## En roadmap
+## Local intelligence
 
-- **Entity Resolution:** detección de duplicados y contradicciones sin alterar registros originales.
-- **Territory Intelligence:** agregación de modalidades, fabricantes y antigüedad por ciudad o país.
-- **Opportunity Radar:** priorización de revisiones de renovación y actualización.
-- **Offline Outbox automático:** cola de eventos idempotentes con reintentos y transporte configurable.
+ATLAS runs its AI operations through `@qvac/sdk` using local model paths and no external inference API.
 
-## Inteligencia local
+| Task | Model | Quantization |
+| --- | --- | --- |
+| Visual understanding | `qvac/VisionPsy-Nano-460M-Flash-GGUFs` | Q4_K_M with imatrix and Q8 projector |
+| Structured extraction | Qwen3 600M Instruct | Q4_0 |
+| Transcription | Whisper Small with Silero VAD | Q8_0 |
+| Asset similarity | EmbeddingGemma 300M | Q8_0 |
 
-Toda inferencia se ejecuta mediante `@qvac/sdk` 0.19.0 con rutas locales y sin fallback hacia APIs externas.
+VisionPsy interprets authorized equipment and nameplate images. Qwen transforms evidence into strict structured output, Whisper processes spoken observations, and EmbeddingGemma ranks potential duplicate assets.
 
-| Función                 | Modelo                                 | Cuantización                      |
-| ----------------------- | -------------------------------------- | --------------------------------- |
-| Comprensión visual      | `qvac/VisionPsy-Nano-460M-Flash-GGUFs` | Q4_K_M con imatrix + proyector Q8 |
-| Extracción estructurada | Qwen3 600M Instruct                    | Q4_0                              |
-| Transcripción           | Whisper Small + Silero VAD             | Q8_0                              |
-| Similitud de activos    | EmbeddingGemma 300M                    | Q8_0                              |
+Model output is always treated as a candidate. A user must review the extracted fields before they become part of the installed-base record.
 
-VisionPsy es el núcleo de la captura visual: interpreta fotografías autorizadas de equipos y placas. Qwen convierte la evidencia en un contrato JSON estricto; Whisper procesa las notas habladas y EmbeddingGemma ayuda a ordenar candidatos duplicados.
+Natural-language inventory queries use Qwen3 1.7B when `models/language/qwen3-1.7b-q4_0.gguf` is available and fall back to Qwen3 0.6B otherwise. Download the larger query model with:
 
-Las salidas de los modelos siempre se consideran candidatas. El usuario confirma los campos antes de incorporarlos a la base instalada.
+```console
+ATLAS_DOWNLOAD_QUERY_1_7B=1 npm run models:download
+```
 
-Las consultas en lenguaje natural y sus respuestas usan Qwen3 1.7B cuando `models/language/qwen3-1.7b-q4_0.gguf` está disponible; si no, usan Qwen3 0.6B. El modelo grande es opcional y se descarga con `ATLAS_DOWNLOAD_QUERY_1_7B=1 npm run models:download`. Para forzar uno u otro: `ATLAS_QUERY_MODEL=0.6b` o `ATLAS_QUERY_MODEL=1.7b`.
+Select a specific query model with `ATLAS_QUERY_MODEL=0.6b` or `ATLAS_QUERY_MODEL=1.7b`.
 
-El backend mantiene un worker local (`src/qvac/worker-server.ts`) que carga el modelo una sola vez y atiende consultas y respuestas naturales por stdio, sin recargarlo en cada petición. Si el worker no está disponible, cada operación cae al CLI de un solo uso.
+The backend maintains a local worker at `src/qvac/worker-server.ts`. It loads models once and serves subsequent extraction and natural-language requests over standard input/output. If the worker is unavailable, an operation can fall back to the single-use local CLI.
 
-## Privacidad y confianza
+## Privacy and trust
 
-- No se admiten fotografías de pacientes, expedientes, gafetes ni personas identificables.
-- Una detección de contenido sensible bloquea la confirmación hasta retirar o redactar la imagen.
-- Los archivos, índices, métricas y registros permanecen en el dispositivo.
-- Las consultas naturales se convierten en filtros permitidos; nunca se ejecuta SQL generado por un modelo.
-- Las oportunidades indican que un activo debe revisarse, no que deba reemplazarse.
-- Cada cambio confirmado crea evidencia de auditoría y un evento idempotente de sincronización.
+- Photos containing patients, medical records, badges, or identifiable people are not accepted.
+- Sensitive-content detection blocks confirmation until the image is removed or redacted.
+- Files, indexes, metrics, and operational records remain on the device.
+- Natural-language questions are converted into an allowlisted filter contract; model-generated SQL is never executed.
+- Renewal signals indicate that an asset needs review, not that it should automatically be replaced.
+- Every confirmed change produces an audit record and an idempotent synchronization event.
 
-## Preparación
+## Project structure
 
-Requisitos verificados en el equipo de referencia:
+- `src/atlas/`: domain logic, capture pipeline, persistence, matching, confidence, analytics, and synchronization.
+- `src/qvac/`: local model worker, inference adapters, and QVAC commands.
+- `web/`: browser-based operations interface and API server.
+- `mobile/`: Android field-capture application.
+- `schemas/`: structured extraction and validation contracts.
+- `migrations/`: SQLite schema migrations.
+- `training/`: LoRA training and evaluation.
+- `data/seed/`: synthetic installed-base observations.
+- `data/evaluation/`: reproducible extraction, inconsistency, and voice cases.
+- `data/finetuning/`: synthetic SFT fixtures for structured extraction.
+- `data/local/`: local databases, evidence, queues, and metrics excluded from Git.
+- `config/models.json`: model paths and runtime configuration.
 
-- Windows 11.
-- AMD Ryzen 7 5800H.
-- 15.3 GB de RAM.
-- NVIDIA RTX 3050 Laptop GPU de 4 GB.
-- Node.js 24, npm 11 y Python 3.11.
-- Sin entorno virtual de Python.
+## Installation
+
+Reference requirements:
+
+- Windows 11
+- Python 3.11 or newer
+- Node.js 22.17 or newer
+- 16 GB of RAM recommended
+- A consumer NVIDIA GPU is recommended for faster local inference
+
+ATLAS uses the system Python installation and does not require a virtual environment.
 
 ```console
 python tools/prepare_environment.py
 ```
 
-Comandos del núcleo:
+The setup script installs dependencies, downloads and verifies model assets, initializes local storage, and runs the project checks.
+
+## Core commands
 
 ```console
 python -m atlas.main init
 python -m atlas.main seed
-python -m atlas.main capture --text "Observación de la visita"
-python -m atlas.main capture --text "Observación revisada" --confirm --observer "usuario"
-python -m atlas.main search --question "Tomógrafos en Panamá con más de siete años"
+python -m atlas.main capture --text "Two CT systems observed at DemoCare Hospital"
+python -m atlas.main capture --text "Reviewed observation" --confirm --observer "user"
+python -m atlas.main search --question "CT systems in Panama older than seven years"
 python -m atlas.main summary
 npm run qvac:health
 ```
 
-### Interfaz web
+## Web application
 
 ```console
 npm install
 npm run dev
 ```
 
-### App para celular (Android)
+## Android application
 
-Desde `mobile/`, después de configurar el entorno Android:
+From `mobile/`, after configuring the Android toolchain:
 
 ```console
 cd mobile
@@ -110,104 +129,63 @@ cd android
 ./gradlew assembleRelease
 ```
 
-El APK resultante queda en `mobile/android/app/build/outputs/apk/release/app-release.apk`.
+The release package is generated at `mobile/android/app/build/outputs/apk/release/app-release.apk`.
 
-Los pesos se descargan y verifican con `tools/download-models.js`. Permanecen fuera de Git y sus rutas están declaradas en `config/models.json`.
+Model weights are downloaded and verified by `tools/download-models.js`. They remain outside Git, and their expected locations are defined in `config/models.json`.
 
-Para ejecutar una demostración reproducible consulta [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md). El adaptador LoRA es opcional: ATLAS usa el modelo base local cuando no hay un adaptador evaluado disponible.
+For a reproducible product walkthrough, see [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md).
 
-## Datos
+## Fine-tuning
 
-- `data/source/` conserva los archivos originales recibidos.
-- `data/seed/installed-base.csv` contiene 20 observaciones sintéticas.
-- `data/evaluation/` contiene casos de voz, inconsistencias y resultados reproducibles.
-- `data/finetuning/` contiene fixtures SFT sintéticos para extracción estructurada.
-- `data/local/` almacena SQLite, evidencia y métricas locales; no se publica en Git.
+ATLAS can use a locally evaluated LoRA adapter for structured extraction. When no approved adapter is configured, it uses the local base model.
 
-Todos los clientes, fabricantes, modelos y escenarios de demostración son ficticios.
+```console
+npm run train:evaluate
+```
 
-## Base preexistente
+Training data is synthetic and stored under `data/finetuning/`. The repository currently provides adapter evaluation through the command above; LoRA training is run directly from the scripts under `training/` when required. Training metrics can be inspected locally with TensorBoard.
 
-El proyecto partió de los siguientes elementos preexistentes:
+## Verification
 
-| Elemento                                                                          | Origen                    | Uso                                                                                                         |
-| --------------------------------------------------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Repositorio inicial (`48aa25d`, 8 de septiembre de 2026, 3:10 p. m. UTC-5)        | Julio Lara                | `.gitignore`, licencia y README inicial                                                                     |
-| Scaffold técnico (`700d18b`, 8 de septiembre de 2026, 5:17 p. m. UTC-5)           | Julio Lara                | Arquitectura, configuración, esquemas, pruebas, stubs, herramientas de entorno y preparación de LoRA        |
-| Actualización del README (`2f33371`, 8 de septiembre de 2026, 6:34 p. m. UTC-5)   | Julio Lara                | Ajuste de documentación                                                                                     |
-| Primer prototipo funcional (`c0d250f`, 9 de septiembre de 2026, 1:04 a. m. UTC-5) | Ethan Martinez            | Interfaz inicial en Flet, SQLite, captura mediante FFmpeg y extracción preliminar con el SDK Python de QVAC |
-| Fuentes y datos originales                                                        | Philips                   | Especificación y dataset sintético                                                                          |
-| Datos derivados                                                                   | Equipo de ATLAS           | Conversión mecánica del workbook a CSV y JSON                                                               |
-| Modelos locales                                                                   | QVAC y Tether AI Research | Pesos excluidos de Git                                                                                      |
+```console
+npm run check
+```
 
-El prototipo del commit `c0d250f` forma parte de la base preexistente. Toda nueva base, plantilla, fuente, modelo o componente externo incorporado se añadirá a esta declaración.
+## Data
 
-## Componentes externos
+- `data/source/` preserves original imported source files.
+- `data/seed/installed-base.csv` contains synthetic installed-base observations.
+- `data/evaluation/` contains reproducible validation cases.
+- `data/finetuning/` contains synthetic structured-extraction fixtures.
+- `data/local/` stores private runtime state and is excluded from Git.
 
-- `@qvac/sdk` y QVAC CLI para inferencia y herramientas locales.
-- Pydantic y RapidFuzz para contratos y coincidencias explicables.
-- Flet para la futura interfaz de escritorio.
-- pytest, Ruff, ESLint, TypeScript, Vitest y Prettier para calidad.
-- TensorBoard y TensorBoardX para seguimiento local del entrenamiento.
+Demo customers, manufacturers, models, and operational scenarios are fictional.
 
-Las versiones exactas se encuentran en `package.json`, `package-lock.json` y `python-requirements.txt`. La licencia MIT cubre únicamente el código propio; los archivos, modelos y componentes externos conservan sus condiciones originales.
+## Networking from WSL
 
-## Demo del celular desde WSL
+When the backend runs inside WSL, expose the API and development server through the Windows host so a phone on the same network can reach them.
 
-Cuando el backend y la interfaz web corren dentro de WSL, el celular no puede alcanzar directamente la IP virtual de WSL (`192.168.x.x` asignada a la interfaz virtual). Es necesario exponer los puertos en Windows mediante `portproxy` y abrir el firewall.
-
-### 1. Redirigir puertos de Windows a WSL
-
-Abrir PowerShell como administrador y ejecutar:
+Run in an elevated Windows PowerShell session:
 
 ```powershell
 $wsl_ip = (wsl hostname -I).Trim().Split()[0]
 
-netsh interface portproxy delete v4tov4 listenport=8000 listenaddress=0.0.0.0
 netsh interface portproxy add v4tov4 listenport=8000 listenaddress=0.0.0.0 connectport=8000 connectaddress=$wsl_ip
-
-netsh interface portproxy delete v4tov4 listenport=5173 listenaddress=0.0.0.0
 netsh interface portproxy add v4tov4 listenport=5173 listenaddress=0.0.0.0 connectport=5173 connectaddress=$wsl_ip
 
 New-NetFirewallRule -DisplayName "ATLAS Backend 8000" -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue
 New-NetFirewallRule -DisplayName "ATLAS Web 5173" -Direction Inbound -LocalPort 5173 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue
-
-netsh interface portproxy show all
 ```
 
-Los errores "The system cannot find the file specified" al borrar reglas son normales si no existían reglas previas.
-
-### 2. Levantar servicios en WSL
+Start the services from WSL:
 
 ```bash
-cd /home/jgonz/projects/ATLAS
-
-# Backend
-source .venv/bin/activate
-ATLAS_P2P_PAIRING_CODE=codigo-demo uvicorn web.server.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Web (en otra terminal)
+ATLAS_P2P_PAIRING_CODE=local-pairing-code uvicorn web.server.main:app --host 0.0.0.0 --port 8000 --reload
 npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
-### 3. Conectar el celular
+Use the laptop's Wi-Fi address—not the WSL virtual address—from the phone. Both devices must be connected to a network that permits device-to-device communication.
 
-Obtener la IP de la laptop en la red Wi-Fi (no la de WSL):
+## License
 
-```powershell
-ipconfig
-```
-
-Desde el navegador del celular, verificar:
-
-```text
-http://<IP_DE_LA_LAPTOP>:8000/api/health
-```
-
-Si carga, abrir la web en la laptop en `http://<IP_DE_LA_LAPTOP>:5173/`, generar el QR de "Potencia compartida" y escanearlo desde ATLAS Field.
-
-### Requisitos de red
-
-- El celular y la laptop deben estar en la misma red Wi-Fi.
-- Algunas redes "guest" bloquean comunicación entre dispositivos.
-- El firewall de Windows debe permitir los puertos 8000 y 5173.
+Original source code is available under the MIT License. Models, datasets, imported files, and third-party components retain their respective licenses and terms.
