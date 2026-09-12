@@ -251,6 +251,7 @@ def test_p2p_invitation_can_be_created_and_consumed(monkeypatch) -> None:
 
 def test_p2p_qr_invite_flow_pairs_and_delegates(monkeypatch) -> None:
     monkeypatch.delenv("ATLAS_P2P_PAIRING_CODE", raising=False)
+    monkeypatch.setattr(api_server, "require_models", lambda *names: None)
 
     class FakeRuntime:
         def run(self, command: str, **options) -> dict:
@@ -322,7 +323,7 @@ def test_p2p_qr_invite_flow_pairs_and_delegates(monkeypatch) -> None:
         app.dependency_overrides.clear()
 
 
-def test_photo_analysis_uses_local_pipeline(tmp_path: Path) -> None:
+def test_photo_analysis_uses_local_pipeline(tmp_path: Path, monkeypatch) -> None:
     class FakePipeline:
         def prepare(self, **kwargs):
             from atlas.domain.observations import Evidence, EvidenceKind, ObservationDraft
@@ -333,6 +334,7 @@ def test_photo_analysis_uses_local_pipeline(tmp_path: Path) -> None:
                 evidence=[Evidence(kind=EvidenceKind.PHOTO, local_path=tmp_path / "photo.jpg")],
             )
 
+    monkeypatch.setattr(api_server, "require_models", lambda *names: None)
     app.dependency_overrides[get_capture_pipeline] = lambda: FakePipeline()
     try:
         response = TestClient(app).post(
@@ -387,7 +389,8 @@ def test_transcription_reports_unavailable_local_model(tmp_path: Path, monkeypat
     assert response.json()["detail"]["missing_models"] == ["whisper-small", "silero-vad"]
 
 
-def _transcribe_with_runtime(runtime, filename: str, payload: bytes) -> dict:
+def _transcribe_with_runtime(runtime, filename: str, payload: bytes, monkeypatch) -> dict:
+    monkeypatch.setattr(api_server, "require_models", lambda *names: None)
     app.dependency_overrides[get_qvac_runtime] = lambda: runtime
     try:
         response = TestClient(app).post(
@@ -400,7 +403,7 @@ def _transcribe_with_runtime(runtime, filename: str, payload: bytes) -> dict:
         app.dependency_overrides.clear()
 
 
-def test_transcription_rewrites_webm_to_decodable_ogg(tmp_path: Path) -> None:
+def test_transcription_rewrites_webm_to_decodable_ogg(tmp_path: Path, monkeypatch) -> None:
     class FakeRuntime:
         calls: list[dict] = []
 
@@ -408,13 +411,15 @@ def test_transcription_rewrites_webm_to_decodable_ogg(tmp_path: Path) -> None:
             self.calls.append({"command": command, **options})
             return {"text": "transcripción"}
 
-    call = _transcribe_with_runtime(FakeRuntime(), "recording.webm", b"fake-webm-bytes")
+    call = _transcribe_with_runtime(
+        FakeRuntime(), "recording.webm", b"fake-webm-bytes", monkeypatch
+    )
 
     assert call["command"] == "transcribe"
     assert Path(call["audio"]).suffix == ".ogg"
 
 
-def test_transcription_keeps_known_wav_suffix(tmp_path: Path) -> None:
+def test_transcription_keeps_known_wav_suffix(tmp_path: Path, monkeypatch) -> None:
     class FakeRuntime:
         calls: list[dict] = []
 
@@ -422,7 +427,7 @@ def test_transcription_keeps_known_wav_suffix(tmp_path: Path) -> None:
             self.calls.append({"command": command, **options})
             return {"text": "transcripción"}
 
-    call = _transcribe_with_runtime(FakeRuntime(), "recording.wav", b"RIFF")
+    call = _transcribe_with_runtime(FakeRuntime(), "recording.wav", b"RIFF", monkeypatch)
 
     assert Path(call["audio"]).suffix == ".wav"
 
