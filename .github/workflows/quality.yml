@@ -38,7 +38,7 @@ jobs:
         run: npm ci --prefix web
 
       - name: Install Python package and quality tools
-        run: python -m pip install -e . pytest==8.3.2 ruff==0.12.11
+        run: python -m pip install -e ".[test]" ruff==0.12.11
 
       - name: Check repository
         run: npm run check
